@@ -1,0 +1,16 @@
+modules:
+  smtp_auth:
+    prober: smtp
+    timeout: 5m
+    smtp:
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      tls: yes
+      tls_config:
+        insecure_skip_verify: false
+        server_name: blubb
+      auth:
+        username: user
+        password: pass
+      helo: hello123
+
