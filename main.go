@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -17,19 +18,23 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/kmille/smtp_exporter/config"
 	webflag "github.com/prometheus/exporter-toolkit/web/kingpinflag"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/expfmt"
+
 	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/common/promlog/flag"
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/exporter-toolkit/web"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"gopkg.in/yaml.v2"
+
+	"github.com/kmille/smtp_exporter/config"
+	"github.com/kmille/smtp_exporter/prober"
 )
 
 var (
@@ -44,6 +49,12 @@ var (
 	routePrefix   = kingpin.Flag("web.route-prefix", "Prefix for the internal routes of web endpoints. Defaults to the path of --web.external-url.").PlaceHolder("<path").String()
 	historyLimit  = kingpin.Flag("history.limit", "The maximum amount of items to keep in the history.").Default("100").Uint()
 	timeoutOffset = kingpin.Flag("timeout-offset", "Offset to subtract from timeout in seconds").Default("0.5").Float64()
+
+	Probers = map[string]prober.ProberFn{
+		"smtp": prober.SmtpProber,
+		// "smtpd": prober.SmtpdProber,
+		// "imap":  prober.ImapProber,
+	}
 
 	moduleUnknownCounter = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "smtp_module_unknown_total",
@@ -120,6 +131,58 @@ func probeHandler(w http.ResponseWriter, r *http.Request, c *config.Config, logg
 
 	h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
 	h.ServeHTTP(w, r)
+
+}
+
+type scrapeLogger struct {
+	next         log.Logger
+	buffer       bytes.Buffer
+	bufferLogger log.Logger
+}
+
+func newScrapeLogger(logger log.Logger, module string, target string) *scrapeLogger {
+	logger = log.With(logger, "module", module, "target", target)
+	sl := &scrapeLogger{
+		next:   logger,
+		buffer: bytes.Buffer{},
+	}
+	bl := log.NewLogfmtLogger(&sl.buffer)
+	sl.bufferLogger = log.With(bl, "ts", log.DefaultTimestampUTC, "caller", log.Caller(6), "module", module, "target", target)
+	return sl
+}
+
+func (sl scrapeLogger) Log(keyvals ...interface{}) error {
+	sl.bufferLogger.Log(keyvals...)
+	kvs := make([]interface{}, len(keyvals))
+	copy(kvs, keyvals)
+	// Switch level to debug for application output
+	for i := 0; i < len(kvs); i += 2 {
+		if kvs[i] == level.Key() {
+			kvs[i+1] = level.DebugValue()
+		}
+	}
+	return sl.next.Log(kvs...)
+}
+
+func DebugOutput(module *config.Module, logBuffer *bytes.Buffer, registry *prometheus.Registry) string {
+	buf := &bytes.Buffer{}
+	fmt.Fprintf(buf, "Logs for the probe:\n")
+	logBuffer.WriteTo(buf)
+	fmt.Fprintf(buf, "\n\nMetrics that would have been returned:\n")
+	mfs, err := registry.Gather()
+	if err != nil {
+		fmt.Fprintf(buf, "Error gathering metrics: %s\n", err)
+	}
+	for _, mf := range mfs {
+		expfmt.MetricFamilyToText(buf, mf)
+	}
+	fmt.Fprintf(buf, "\n\n\nModule configuration:\n")
+	c, err := yaml.Marshal(module)
+	if err != nil {
+		fmt.Fprintf(buf, "Error marshalling config: %s\n", err)
+	}
+	buf.Write(c)
+	return buf.String()
 
 }
 
