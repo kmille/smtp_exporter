@@ -326,8 +326,8 @@ func run() int {
 			<head><title>Smtp Exporter</title></head>
 			<body>
 			<h1>Smtp Exporter</h1>
-			<p><a href="probe?target=mail01.example.com&module=yourmodule">Probe mail01.example.com for yourmodule</a></p>
-			<p><a href="probe?target=mail01.example.com&module=yourmodule&debug=true">Debug Probe mail01.example.com for yourmodule</a></p>
+			<p><a href="probe?target=mail01.example.com&module=smtp_auth">Probe mail01.example.com for yourmodule</a></p>
+			<p><a href="probe?target=mail01.example.com&module=smtp_auth&debug=true">Debug Probe mail01.example.com for yourmodule</a></p>
 			<p><a href="metrics">Metrics</a></p>
 			<p><a href="config">Configuuration</a></p>
 			<p>TODO: links to the docs</p>

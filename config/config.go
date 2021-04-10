@@ -40,8 +40,8 @@ type SafeConfig struct {
 }
 
 type SMTPAuth struct {
-	Username string `yaml:"username,omitempty"`
-	Password string `yaml:"password,omitempty"`
+	username string `yaml:"username,omitempty"`
+	password string `yaml:"password,omitempty"`
 }
 
 type Module struct {
