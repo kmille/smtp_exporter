@@ -1,6 +1,8 @@
 package main
 
-import "sync"
+import (
+	"sync"
+)
 
 type result struct {
 	id          int64
@@ -68,7 +70,6 @@ func (rh *resultHistory) Get(id int64) *result {
 			return r
 		}
 	}
-
 	for _, r := range rh.preservedFailedResults {
 		if r.id == id {
 			return r

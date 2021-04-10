@@ -282,11 +282,9 @@ func run() int {
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			// no other handler matched
 			if r.URL.Path != "/" {
-				fmt.Println("we are here2")
 				http.NotFound(w, r)
 				return
 			}
-			fmt.Println("we are here3")
 			fmt.Println("Redirecting to", beURL.String())
 			// TODO: is this a bug?
 			http.Redirect(w, r, beURL.String(), http.StatusFound)
@@ -322,8 +320,19 @@ func run() int {
 	})
 
 	http.HandleFunc(*routePrefix, func(w http.ResponseWriter, r *http.Request) {
+
 		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte("TODO table header"))
+		w.Write([]byte(`<html>
+			<head><title>Smtp Exporter</title></head>
+			<body>
+			<h1>Smtp Exporter</h1>
+			<p><a href="probe?target=mail01.example.com&module=yourmodule">Probe mail01.example.com for yourmodule</a></p>
+			<p><a href="probe?target=mail01.example.com&module=yourmodule&debug=true">Debug Probe mail01.example.com for yourmodule</a></p>
+			<p><a href="metrics">Metrics</a></p>
+			<p><a href="config">Configuuration</a></p>
+			<p>TODO: links to the docs</p>
+			<h2>Recent Probes</h2>
+			<table border='1'><tr><th>Module</th><th>Target</th><th>Result</th><th>Debug</th>`))
 
 		results := rh.List()
 		for i := len(results) - 1; i >= 0; i-- {
@@ -332,11 +341,18 @@ func run() int {
 			if !r.success {
 				success = "<strong>Failure</strong>"
 			}
-			fmt.Fprintf(w, "<tr><trd>%s</td><td>%s</td><td>%s</td></td><a href='logs?id=%d'>Logs</a></td></tr>",
+			fmt.Fprintf(w, `<tr>
+								<td>%s</td>
+								<td>%s</td>
+								<td>%s</td>
+								<td><a href='logs?id=%d'>Logs</a></td>
+							</tr>`,
 				html.EscapeString(r.moduleName), html.EscapeString(r.target), success, r.id)
 		}
 
-		w.Write([]byte("</table></body></html>"))
+		w.Write([]byte(`</table></body>
+		 </html>`))
+
 	})
 
 	http.HandleFunc(path.Join(*routePrefix, "/logs"), func(w http.ResponseWriter, r *http.Request) {
@@ -346,7 +362,7 @@ func run() int {
 			return
 		}
 		result := rh.Get(id)
-		if result != nil {
+		if result == nil {
 			http.Error(w, "Probe id not found", 404)
 			return
 		}

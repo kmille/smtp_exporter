@@ -10,5 +10,5 @@ import (
 
 func SmtpProber(ctx context.Context, target string, module config.Module, registry *prometheus.Registry, logger log.Logger) (success bool) {
 	logger.Log("yea that works")
-	return false
+	return true
 }
