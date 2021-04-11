@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
-	"os"
 	"strings"
 	"time"
 
@@ -20,7 +19,7 @@ import (
 	pconfig "github.com/prometheus/common/config"
 )
 
-func SmtpProber(ctx context.Context, target string, module config.Module, registry *prometheus.Registry, logger log.Logger, hl *HistoryLog) (success bool) {
+func SmtpProber(ctx context.Context, target string, module config.Module, registry *prometheus.Registry, logger log.Logger, hl *HistoryLog) bool {
 
 	// TODO: move this to config.go and check it if the module is loaded
 	mailFrom := module.SMTP.MailFrom
@@ -45,6 +44,9 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 	}
 
 	var (
+		statusCode         int
+		statusCodeEnhanced int
+
 		probeTLSVersion = prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "probe_tls_version_info",
@@ -80,6 +82,23 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 		})
 	)
 
+	handleSmtpError := func(err error, msg string) {
+		smtpErr := err.(*smtp.SMTPError)
+		smtpEnhancedCode := smtpErr.EnhancedCode[0]*100 + smtpErr.EnhancedCode[1]*10 + smtpErr.EnhancedCode[2]
+		level.Error(logger).Log("msg", msg, "err", err, "code", smtpErr.Code, "enhancedCode", smtpEnhancedCode)
+		probeSmtpStatusCode.Set(float64(smtpErr.Code))
+		probeSmtpEnhancedStatusCode.Set(float64(smtpEnhancedCode))
+
+		validStatusCodes := strings.Join(strings.Split(fmt.Sprint(module.SMTP.ValidStatusCodes), " "), ",")
+		level.Info(logger).Log("msg", "Checking valid status codes", "validStatusCodes", validStatusCodes)
+		for _, validStatusCode := range module.SMTP.ValidStatusCodes {
+			if validStatusCode == smtpErr.Code {
+				statusCode = smtpErr.Code
+				statusCodeEnhanced = smtpEnhancedCode
+			}
+		}
+	}
+
 	registry.MustRegister(probeIsTLSGauge)
 	registry.MustRegister(probeTLSCertExpireGauge)
 	registry.MustRegister(probeSmtpStatusCode)
@@ -105,7 +124,7 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 
 	c, err := NewSmtpClient(net.JoinHostPort(ip.String(), targetPort), serverName, module, logger)
 	if err != nil {
-		handleError(logger, err, probeSmtpStatusCode, probeSmtpEnhancedStatusCode, "error Creating smtp client")
+		handleSmtpError(err, "Error creating smtp client")
 		return false
 	}
 
@@ -121,7 +140,7 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 	// 	level.Info(logger).Log("msg", "test1\ntest")
 	// 	level.Info(logger).Log("msg", `test2\ntest`)
 	// }()
-	c.DebugWriter = os.Stdout
+	// c.DebugWriter = os.Stdout
 
 	state, ok := c.TLSConnectionState()
 	if ok {
@@ -136,35 +155,29 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 	if len(module.SMTP.Auth.Username) > 0 {
 		auth := sasl.NewPlainClient("", module.SMTP.Auth.Username, module.SMTP.Auth.Password)
 		if err = c.Auth(auth); err != nil {
-			handleError(logger, err, probeSmtpStatusCode, probeSmtpEnhancedStatusCode, "Error sending AUTH command")
+			handleSmtpError(err, "Error sending AUTH command")
 			return false
 		}
-		level.Info(logger).Log("msg", "Successfully authenticated")
+		level.Info(logger).Log("msg", "Authenticated was successful")
 	} else {
-		level.Info(logger).Log("msg", "I will not authenticate")
-
+		level.Info(logger).Log("msg", "Skipping authentication (not configured)")
 	}
 
 	if err = c.Mail(mailFrom, nil); err != nil {
-		level.Error(logger).Log("msg", "Error sending MAIL FROM command", "err", err)
-		smtpErr, ok := err.(*smtp.SMTPError)
-		if ok {
-			level.Error(logger).Log("msg", "Error sending MAIL FROM command", "err", smtpErr.Code)
-		}
-
+		handleSmtpError(err, "Error sending MAIL FROM command")
 		return false
 	}
-	level.Info(logger).Log("msg", "MAIL FROM was successfull")
+	level.Info(logger).Log("msg", "MAIL FROM command sent successfully")
 
 	if err = c.Rcpt(mailTo); err != nil {
-		level.Error(logger).Log("msg", "Error sending MAIL TO command", "err", err)
+		handleSmtpError(err, "Error sending RCPT TO command")
 		return false
 	}
-	level.Info(logger).Log("msg", "MAIL TO was successfull")
+	level.Info(logger).Log("msg", "RCPT TO command sent successfully")
 
 	w, err := c.Data()
 	if err != nil {
-		level.Error(logger).Log("msg", "Error sending DATA command", "err", err)
+		handleSmtpError(err, "Error sending DATA command")
 		return false
 	}
 
@@ -199,23 +212,25 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 
 	_, err = w.Write([]byte(message))
 	if err != nil {
-		level.Error(logger).Log("msg", "Could not send email ", "err", err)
-		return false
+		level.Error(logger).Log("msg", "Error sinding email data ", "err", err)
 	}
 	err = w.Close()
 	if err != nil {
-		level.Error(logger).Log("msg", "Could not close email buffer", "err", err)
-		return false
+		level.Error(logger).Log("msg", "Error closing the email buffer", "err", err)
 	}
 
 	err = c.Quit()
 	if err != nil {
-		level.Error(logger).Log("msg", "Could not send QUIT", err)
+		handleSmtpError(err, "Error sending QUIT command")
 		return false
 	}
 
-	probeSmtpStatusCode.Set(float64(221))
-	probeSmtpEnhancedStatusCode.Set(float64(200))
+	defer func() {
+		// probeSmtpStatusCode.Set(float64(221))
+		// probeSmtpEnhancedStatusCode.Set(float64(200))
+		probeSmtpStatusCode.Set(float64(statusCode))
+		probeSmtpEnhancedStatusCode.Set(float64(statusCodeEnhanced))
+	}()
 
 	return true
 }
@@ -231,7 +246,7 @@ func NewSmtpClient(target, serverName string, module config.Module, logger log.L
 			return nil, err
 		}
 
-		err = helo(c, serverName, module)
+		err = ehlo(c, serverName, module)
 		if err != nil {
 			return nil, err
 		}
@@ -259,7 +274,7 @@ func NewSmtpClient(target, serverName string, module config.Module, logger log.L
 			return nil, err
 		}
 
-		err = helo(c, serverName, module)
+		err = ehlo(c, serverName, module)
 		if err != nil {
 			return nil, err
 		}
@@ -271,7 +286,7 @@ func NewSmtpClient(target, serverName string, module config.Module, logger log.L
 func NewSmtpTlsConfig(serverName string, module config.Module, logger log.Logger) (*tls.Config, error) {
 	tlsConfig, err := pconfig.NewTLSConfig(&module.SMTP.TLSConfig)
 	if err != nil {
-		return nil, fmt.Errorf("could not create TLS config: %s", err)
+		return nil, err
 	}
 	if len(tlsConfig.ServerName) == 0 {
 		tlsConfig.ServerName = serverName
@@ -293,15 +308,6 @@ func ehlo(c *smtp.Client, serverName string, module config.Module) error {
 	return nil
 }
 
-func handleError(logger log.Logger, err error, probeSmtpStatusCode prometheus.Gauge, probeSmtpEnhancedStatusCode prometheus.Gauge, msg string) {
-	level.Error(logger).Log("msg", msg, "err", err)
-	smtpErr, ok := err.(*smtp.SMTPError)
-	if ok {
-		probeSmtpStatusCode.Set(float64(smtpErr.Code))
-		probeSmtpEnhancedStatusCode.Set(float64(smtpErr.EnhancedCode[0]*100 + smtpErr.EnhancedCode[1]*10 + smtpErr.EnhancedCode[2]))
-	}
-}
-
 type HistoryLog struct {
 	buf *bytes.Buffer
 }
@@ -315,5 +321,5 @@ func (hl *HistoryLog) Write(p []byte) (int, error) {
 }
 
 func (hl *HistoryLog) String() string {
-	return strings.Replace(hl.buf.String(), `\n`, "\n", -1)
+	return hl.buf.String()
 }

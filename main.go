@@ -113,7 +113,7 @@ func probeHandler(w http.ResponseWriter, r *http.Request, c *config.Config, logg
 	registry.MustRegister(probeDurationGauge)
 	success := prober(ctx, target, module, registry, sl, hl)
 	duration := time.Since(start).Seconds()
-	fmt.Println(hl)
+	// fmt.Println(hl)
 	probeDurationGauge.Set(duration)
 	if success {
 		probeSuccessGauge.Set(1)

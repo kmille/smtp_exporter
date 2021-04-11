@@ -61,6 +61,7 @@ type SmtpProbe struct {
 	MailTo             string            `yaml:"mail_to,omitempty"`
 	Headers            map[string]string `yaml:"headers,omitempty"`
 	Body               string            `yaml:"body,omitempty"`
+	ValidStatusCodes   []int             `yaml:"valid_status_codes,omitempty"`
 }
 
 func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
