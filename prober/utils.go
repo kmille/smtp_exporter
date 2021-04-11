@@ -64,8 +64,8 @@ func chooseProtocol(ctx context.Context, IPProtocol string, fallbackIPProtocol b
 
 	resolver := &net.Resolver{}
 
-	level.Info(logger).Log("msg", "Resolving target addreses", "ip_protocol", IPProtocol)
-	if ips, err := resolver.LookupIP(ctx, IPProtocol, target); err != nil {
+	level.Info(logger).Log("msg", "Resolving target addreses", "targetHost", target, "ip_protocol", IPProtocol)
+	if ips, err := resolver.LookupIP(ctx, IPProtocol, target); err == nil {
 		level.Info(logger).Log("msg", "Resolved target address", "ip", ips[0].String())
 		usedProtocol = IPProtocol
 		ip = &net.IPAddr{IP: ips[0]}

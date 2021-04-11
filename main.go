@@ -98,6 +98,7 @@ func probeHandler(w http.ResponseWriter, r *http.Request, c *config.Config, logg
 		return
 	}
 
+	hl := prober.NewHistoryLog()
 	prober, ok := Probers[module.Prober]
 	if !ok {
 		http.Error(w, fmt.Sprintf("Unknown prober %q", module.Prober), http.StatusBadRequest)
@@ -110,8 +111,9 @@ func probeHandler(w http.ResponseWriter, r *http.Request, c *config.Config, logg
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(probeSuccessGauge)
 	registry.MustRegister(probeDurationGauge)
-	success := prober(ctx, target, module, registry, sl)
+	success := prober(ctx, target, module, registry, sl, hl)
 	duration := time.Since(start).Seconds()
+	fmt.Println(hl)
 	probeDurationGauge.Set(duration)
 	if success {
 		probeSuccessGauge.Set(1)

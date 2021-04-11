@@ -40,8 +40,8 @@ type SafeConfig struct {
 }
 
 type SMTPAuth struct {
-	username string `yaml:"username,omitempty"`
-	password string `yaml:"password,omitempty"`
+	Username string `yaml:"username,omitempty"`
+	Password string `yaml:"password,omitempty"`
 }
 
 type Module struct {
@@ -51,12 +51,16 @@ type Module struct {
 }
 
 type SmtpProbe struct {
-	IPProtocol         string           `yaml:"preferred_ip_protocol,omitempty"`
-	IPProtocolFallback bool             `yaml:"ip_protocol_fallback,omitempty"`
-	TLS                string           `yaml:"tls,omitempty"`
-	TLSConfig          config.TLSConfig `yaml:"tls_config,omitempty"`
-	Auth               SMTPAuth         `yaml:"auth,omitempty"`
-	HELO               string           `yaml:"helo,omitempty"`
+	IPProtocol         string            `yaml:"preferred_ip_protocol,omitempty"`
+	IPProtocolFallback bool              `yaml:"ip_protocol_fallback,omitempty"`
+	TLS                string            `yaml:"tls,omitempty"`
+	TLSConfig          config.TLSConfig  `yaml:"tls_config,omitempty"`
+	Auth               SMTPAuth          `yaml:"auth,omitempty"`
+	EHLO               string            `yaml:"ehlo,omitempty"`
+	MailFrom           string            `yaml:"mail_from,omitempty"`
+	MailTo             string            `yaml:"mail_to,omitempty"`
+	Headers            map[string]string `yaml:"headers,omitempty"`
+	Body               string            `yaml:"body,omitempty"`
 }
 
 func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {

@@ -9,4 +9,4 @@ import (
 	"github.com/kmille/smtp_exporter/config"
 )
 
-type ProberFn func(ctx context.Context, target string, config config.Module, registry *prometheus.Registry, logger log.Logger) bool
+type ProberFn func(ctx context.Context, target string, config config.Module, registry *prometheus.Registry, logger log.Logger, hl *HistoryLog) bool
