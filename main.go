@@ -328,8 +328,8 @@ func run() int {
 			<head><title>Smtp Exporter</title></head>
 			<body>
 			<h1>Smtp Exporter</h1>
-			<p><a href="probe?target=mail01.example.com&module=smtp_auth">Probe mail01.example.com for yourmodule</a></p>
-			<p><a href="probe?target=mail01.example.com&module=smtp_auth&debug=true">Debug Probe mail01.example.com for yourmodule</a></p>
+			<p><a href="probe?target=smtp.gmail.com:465&module=smtp_tls_auth_fail:">Probe smtp.gmail.com for smtp_tls_auth_fail</a></p>
+			<p><a href="probe?target=smtp.gmail.com:465&module=smtp_tls_auth_fail&debug=true">Debug Probe smtp.gmail.com for smtp_tls_auth_fail</a></p>
 			<p><a href="metrics">Metrics</a></p>
 			<p><a href="config">Configuuration</a></p>
 			<p>TODO: links to the docs</p>

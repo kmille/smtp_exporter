@@ -2,9 +2,13 @@ package prober
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"hash/fnv"
+	"math"
+	"math/big"
 	"net"
+	"os"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -86,6 +90,7 @@ func chooseProtocol(ctx context.Context, IPProtocol string, fallbackIPProtocol b
 	level.Info(logger).Log("msg", "Resolved target address", "ip", ips[0].String())
 	usedProtocol = fallbackProtocol
 	ip = &net.IPAddr{IP: ips[0]}
+
 	return
 }
 
@@ -93,4 +98,20 @@ func ipHash(ip net.IP) float64 {
 	h := fnv.New32a()
 	h.Write(ip)
 	return float64(h.Sum32())
+}
+
+func generateMessageID() string {
+	t := time.Now().UnixNano()
+	pid := os.Getpid()
+	rint, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
+	if err != nil {
+		panic(fmt.Sprintf("error generating MessageID: %s", err))
+	}
+	h, err := os.Hostname()
+	// If we can't get the hostname, we'll use localhost
+	if err != nil {
+		h = "localhost.localdomain"
+	}
+	msgid := fmt.Sprintf("<%d.%d.%d@%s>", t, pid, rint, h)
+	return msgid
 }
