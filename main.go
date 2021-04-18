@@ -331,7 +331,7 @@ func run() int {
 			<p><a href="probe?target=smtp.gmail.com:465&module=smtp_tls_auth_fail:">Probe smtp.gmail.com for smtp_tls_auth_fail</a></p>
 			<p><a href="probe?target=smtp.gmail.com:465&module=smtp_tls_auth_fail&debug=true">Debug Probe smtp.gmail.com for smtp_tls_auth_fail</a></p>
 			<p><a href="metrics">Metrics</a></p>
-			<p><a href="config">Configuuration</a></p>
+			<p><a href="config">Configuration</a></p>
 			<p>TODO: links to the docs</p>
 			<h2>Recent Probes</h2>
 			<table border='1'><tr><th>Module</th><th>Target</th><th>Result</th><th>Debug</th>`))
