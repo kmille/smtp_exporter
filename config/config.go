@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"sync"
 	"time"
 
@@ -62,6 +63,40 @@ type SmtpProbe struct {
 	Headers            map[string]string `yaml:"headers,omitempty"`
 	Body               string            `yaml:"body,omitempty"`
 	ValidStatusCodes   []int             `yaml:"valid_status_codes,omitempty"`
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (s *SmtpProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*s = SmtpProbe{}
+	type plain SmtpProbe
+	if err := unmarshal((*plain)(s)); err != nil {
+		return err
+	}
+
+	if len(s.MailFrom) == 0 {
+		// TODO: encorce a non-emtpy from header?
+		s.MailFrom = s.Headers["from"]
+	}
+
+	if len(s.MailTo) == 0 {
+		// TODO: encorce a non-emtpy to header?
+		s.MailTo = s.Headers["to"]
+	}
+
+	if len(s.TLS) == 0 {
+		s.TLS = "no"
+	}
+
+	r, _ := regexp.Compile("no|starttls|tls")
+	if !r.MatchString(s.TLS) {
+		return fmt.Errorf("smtp prober: tls value must be a an empty string (implicit no) or no|starttls|tls. Found: %q", s.TLS)
+	}
+
+	if len(s.EHLO) == 0 {
+		s.EHLO = "localhost"
+	}
+
+	return nil
 }
 
 func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {

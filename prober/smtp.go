@@ -22,30 +22,6 @@ import (
 
 func SmtpProber(ctx context.Context, target string, module config.Module, registry *prometheus.Registry, logger log.Logger, hl *HistoryLog) bool {
 
-	// TODO: move this to config.go and check it if the module is loaded
-	mailFrom := module.SMTP.MailFrom
-	if len(mailFrom) == 0 {
-		mailFrom = module.SMTP.Headers["from"]
-		// var ok bool
-		// mailFrom, ok = module.SMTP.Headers["from"]
-		// if !ok {
-		// 	level.Error(logger).Log("msg", "Error parsing module configuration. MailFrom not found")
-		// 	return false
-		// }
-	}
-
-	mailTo := module.SMTP.MailTo
-	if len(mailTo) == 0 {
-		mailTo = module.SMTP.Headers["to"]
-		// var ok bool
-		// TODO: does this work with TO, To?
-		// mailTo, ok = module.SMTP.Headers["to"]
-		// if !ok {
-		// 	level.Error(logger).Log("msg", "Error parsing module configuration. MailTo not found")
-		// 	return false
-		// }
-	}
-
 	// mailFrom := module.SMTP.MailFrom
 	// mailTo := module.SMTP.MailTo
 
@@ -123,23 +99,20 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 	historyLog := NewHistoryLog()
 
 	NewSmtpClient := func(targetIpPort, serverName string) (c *smtp.Client, err error) {
-
-		if len(module.SMTP.TLS) == 0 ||
-			module.SMTP.TLS == "no" ||
-			module.SMTP.TLS == "starttls" {
-
+		if strings.EqualFold(module.SMTP.TLS, "no") ||
+			strings.EqualFold(module.SMTP.TLS, "starttls") {
 			c, err = smtp.Dial(targetIpPort)
 			if err != nil {
 				return nil, err
 			}
 
 			c.DebugWriter = historyLog
-			err = ehlo(c, serverName, module)
+			err = ehlo(c, module)
 			if err != nil {
 				return nil, err
 			}
 
-			if module.SMTP.TLS == "starttls" {
+			if strings.EqualFold(module.SMTP.TLS, "starttls") {
 				tlsConfig, err := NewSmtpTlsConfig(serverName, module, logger)
 				if err != nil {
 					return nil, err
@@ -151,7 +124,7 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 			}
 		}
 
-		if module.SMTP.TLS == "tls" {
+		if strings.EqualFold(module.SMTP.TLS, "tls") {
 			tlsConfig, err := NewSmtpTlsConfig(serverName, module, logger)
 			if err != nil {
 				return nil, err
@@ -163,7 +136,7 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 			}
 
 			c.DebugWriter = historyLog
-			err = ehlo(c, serverName, module)
+			err = ehlo(c, module)
 			if err != nil {
 				return nil, err
 			}
@@ -207,9 +180,6 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 	}
 
 	defer func() {
-		// probeSmtpStatusCode.Set(float64(221))
-		// probeSmtpEnhancedStatusCode.Set(float64(200))
-
 		probeSmtpStatusCode.Set(float64(statusCode))
 		probeSmtpEnhancedStatusCode.Set(float64(statusCodeEnhanced))
 		fmt.Printf("Let's print the history\n%s", historyLog.buf.String())
@@ -226,7 +196,7 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 	}
 
 	if len(module.SMTP.Auth.Username) > 0 {
-		auth := sasl.NewPlainClient("", module.SMTP.Auth.Username, module.SMTP.Auth.Password)
+		auth := sasl.NewPlainClient("", module.SMTP.Auth.Username, string(module.SMTP.Auth.Password))
 		if err = c.Auth(auth); err != nil {
 			handleSmtpError(c, err, "Error sending AUTH command")
 			return success
@@ -236,13 +206,13 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 		level.Info(logger).Log("msg", "Skipping authentication (not configured)")
 	}
 
-	if err = c.Mail(mailFrom, nil); err != nil {
+	if err = c.Mail(module.SMTP.MailFrom, nil); err != nil {
 		handleSmtpError(c, err, "Error sending MAIL FROM command")
 		return success
 	}
 	level.Info(logger).Log("msg", "MAIL FROM command sent successfully")
 
-	if err = c.Rcpt(mailTo); err != nil {
+	if err = c.Rcpt(module.SMTP.MailTo); err != nil {
 		handleSmtpError(c, err, "Error sending RCPT TO command")
 		return success
 	}
@@ -301,6 +271,8 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 	}
 
 	success = true
+	probeSmtpStatusCode.Set(float64(221))
+	probeSmtpEnhancedStatusCode.Set(float64(200))
 
 	return success
 }
@@ -316,13 +288,8 @@ func NewSmtpTlsConfig(serverName string, module config.Module, logger log.Logger
 	return tlsConfig, nil
 }
 
-func ehlo(c *smtp.Client, serverName string, module config.Module) error {
-
-	ehlo := module.SMTP.EHLO
-	if len(ehlo) == 0 {
-		ehlo = serverName
-	}
-	err := c.Hello(ehlo)
+func ehlo(c *smtp.Client, module config.Module) error {
+	err := c.Hello(module.SMTP.EHLO)
 	if err != nil {
 		return err
 	}
@@ -338,12 +305,13 @@ func NewHistoryLog() *HistoryLog {
 }
 
 func (hl *HistoryLog) Write(p []byte) (int, error) {
-	lenData := len(p)
 	if strings.HasPrefix(string(p), "AUTH PLAIN") {
-		p = []byte("AUTH PLAIN *******************\r\n")
+		hl.buf.Write([]byte("AUTH PLAIN <secret>\r\n"))
+	} else {
+		hl.buf.Write(p)
 	}
-	hl.buf.Write(p)
-	return lenData, nil
+	return len(p), nil
+
 }
 
 func (hl *HistoryLog) String() string {
