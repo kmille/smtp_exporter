@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"time"
+
+	pconfig "github.com/prometheus/common/config"
 )
 
 func getTLSVersion(state *tls.ConnectionState) string {
@@ -32,4 +34,13 @@ func getFingerprint(state *tls.ConnectionState) string {
 	cert := state.PeerCertificates[0]
 	fingerprint := sha256.Sum256(cert.Raw)
 	return hex.EncodeToString(fingerprint[:])
+}
+
+func newTLSConfig(promTLSConfig *pconfig.TLSConfig) (*tls.Config, error) {
+
+	tlsConfig, err := pconfig.NewTLSConfig(promTLSConfig)
+	if err != nil {
+		return nil, err
+	}
+	return tlsConfig, nil
 }

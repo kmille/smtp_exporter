@@ -51,6 +51,15 @@ type Module struct {
 	SMTP    SmtpProbe     `yaml:"smtp,omitempty"`
 }
 
+type Imap struct {
+	TLS       string           `yaml:"tls,omitempty"`
+	TLSConfig config.TLSConfig `yaml:"tls_config,omitempty"`
+	Auth      SMTPAuth         `yaml:"auth,omitempty"`
+	Server    string           `yaml:"server,omitempty"`
+	Port      int              `yaml:"port,omitempty"`
+	Mailbox   string           `yaml:"mailbox,omitempty"`
+}
+
 type SmtpProbe struct {
 	IPProtocol         string            `yaml:"preferred_ip_protocol,omitempty"`
 	IPProtocolFallback bool              `yaml:"ip_protocol_fallback,omitempty"`
@@ -63,6 +72,8 @@ type SmtpProbe struct {
 	Headers            map[string]string `yaml:"headers,omitempty"`
 	Body               string            `yaml:"body,omitempty"`
 	ValidStatusCodes   []int             `yaml:"valid_status_codes,omitempty"`
+	Receiver           string            `yaml:"receiver,omitempty"`
+	Imap               Imap              `yaml:"imap,omitempty"`
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -87,13 +98,50 @@ func (s *SmtpProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		s.TLS = "no"
 	}
 
-	r, _ := regexp.Compile("no|starttls|tls")
+	r, _ := regexp.Compile(`^(no|starttls|tls)$`)
 	if !r.MatchString(s.TLS) {
 		return fmt.Errorf("smtp prober: tls value must be a an empty string (implicit no) or no|starttls|tls. Found: %q", s.TLS)
 	}
 
 	if len(s.EHLO) == 0 {
 		s.EHLO = "localhost"
+	}
+
+	return nil
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (i *Imap) UnmarshalYAML(unmarshal func(interface{}) error) error {
+
+	*i = Imap{}
+	type plain Imap
+	if err := unmarshal((*plain)(i)); err != nil {
+		return err
+	}
+
+	if len(i.Server) == 0 {
+		return fmt.Errorf("imap prober: server must not be empty. Found: %q", i.Server)
+	}
+
+	if i.Port == 0 {
+		return fmt.Errorf("imap prober: port must not be empty. Found: %q", i.Port)
+	}
+
+	if len(i.Mailbox) == 0 {
+		i.Mailbox = "INBOX"
+	}
+
+	if len(i.TLS) == 0 {
+		i.TLS = "no"
+	}
+
+	r, _ := regexp.Compile(`^(no|starttls|tls)$`)
+	if !r.MatchString(i.TLS) {
+		return fmt.Errorf("imap prober: tls value must be a an empty string (implicit no) or no|starttls|tls. Found: %q", i.TLS)
+	}
+
+	if len(i.TLSConfig.ServerName) == 0 {
+		i.TLSConfig.ServerName = i.Server
 	}
 
 	return nil

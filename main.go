@@ -48,12 +48,10 @@ var (
 	externalURL   = kingpin.Flag("web.external-url", "The URL under which smtp exporter is externally reachable (for example, if smtp exporter is served via a reverse proxy). Used for generating relative and absolute links back to smtp exporter itself. If the URL has a path portion, it will be used to prefix all HTTP endpoints served by smtp exporter. If omitted, relevant URL components will be derived automatically.").PlaceHolder("<url>").String()
 	routePrefix   = kingpin.Flag("web.route-prefix", "Prefix for the internal routes of web endpoints. Defaults to the path of --web.external-url.").PlaceHolder("<path").String()
 	historyLimit  = kingpin.Flag("history.limit", "The maximum amount of items to keep in the history.").Default("100").Uint()
-	timeoutOffset = kingpin.Flag("timeout-offset", "Offset to subtract from timeout in seconds").Default("0.5").Float64()
+	timeoutOffset = kingpin.Flag("timeout-offset", "Offset to subtract from timeout in seconds").Default("0").Float64()
 
 	Probers = map[string]prober.ProberFn{
 		"smtp": prober.SmtpProber,
-		// "smtpd": prober.SmtpdProber,
-		// "imap":  prober.ImapProber,
 	}
 
 	moduleUnknownCounter = prometheus.NewCounter(prometheus.CounterOpts{
@@ -91,6 +89,7 @@ func probeHandler(w http.ResponseWriter, r *http.Request, c *config.Config, logg
 		Name: "probe_duration_seconds",
 		Help: "Returns how long the probe took to complete in seconds",
 	})
+
 	params := r.URL.Query()
 	target := params.Get("target")
 	if target == "" {
@@ -98,12 +97,12 @@ func probeHandler(w http.ResponseWriter, r *http.Request, c *config.Config, logg
 		return
 	}
 
-	hl := prober.NewHistoryLog()
 	prober, ok := Probers[module.Prober]
 	if !ok {
 		http.Error(w, fmt.Sprintf("Unknown prober %q", module.Prober), http.StatusBadRequest)
 		return
 	}
+
 	sl := newScrapeLogger(logger, moduleName, target)
 	level.Info(sl).Log("msg", "Beginning probe", "probe", module.Prober, "timeout_seconds", timeoutSeconds)
 
@@ -111,9 +110,21 @@ func probeHandler(w http.ResponseWriter, r *http.Request, c *config.Config, logg
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(probeSuccessGauge)
 	registry.MustRegister(probeDurationGauge)
-	success := prober(ctx, target, module, registry, sl, hl)
+
+	smtpProberResult := prober(ctx, target, module, registry, sl)
+	success := smtpProberResult.Success
+	// if module.Prober == "imap" && success {
+	// 	imapProberResult := prober.ImapProber(ctx, smtpProberResult.Subject, module, registry, sl)
+	// 	success = imapProberResult.Success
+	// fmt.Fprintf(&sl.buffer, "\nIMAP commands:\n")
+	// fmt.Fprint(&sl.buffer, imapProberResult.Commands.String())
+
+	// }
+
+	// fmt.Fprintf(&sl.buffer, "\nSMTP commands:\n")
+	// fmt.Fprint(&sl.buffer, smtpProberResult.Commands.String())
+
 	duration := time.Since(start).Seconds()
-	// fmt.Println(hl)
 	probeDurationGauge.Set(duration)
 	if success {
 		probeSuccessGauge.Set(1)
@@ -199,7 +210,8 @@ func getTimeout(r *http.Request, module config.Module, offset float64) (timeoutS
 	}
 
 	if timeoutSeconds == 0 {
-		timeoutSeconds = 120
+		// timeoutSeconds = 120
+		timeoutSeconds = 5
 	}
 
 	var maxTimeOutSeconds = timeoutSeconds - offset
