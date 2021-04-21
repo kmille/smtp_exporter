@@ -57,8 +57,7 @@ func (rh *resultHistory) Add(moduleName, target, debugOutput string, success boo
 func (rh *resultHistory) List() []*result {
 	rh.mu.Lock()
 	defer rh.mu.Unlock()
-	// TODO: why [:]?
-	return append(rh.results[:], rh.preservedFailedResults...)
+	return append(rh.preservedFailedResults[:], rh.results...)
 }
 
 func (rh *resultHistory) Get(id int64) *result {
