@@ -51,7 +51,7 @@ type Module struct {
 	SMTP    SmtpProbe     `yaml:"smtp,omitempty"`
 }
 
-type Imap struct {
+type ImapReceiver struct {
 	TLS       string           `yaml:"tls,omitempty"`
 	TLSConfig config.TLSConfig `yaml:"tls_config,omitempty"`
 	Auth      SMTPAuth         `yaml:"auth,omitempty"`
@@ -73,7 +73,7 @@ type SmtpProbe struct {
 	Body               string            `yaml:"body,omitempty"`
 	ValidStatusCodes   []int             `yaml:"valid_status_codes,omitempty"`
 	Receiver           string            `yaml:"receiver,omitempty"`
-	Imap               Imap              `yaml:"imap,omitempty"`
+	IMAP               ImapReceiver      `yaml:"imap,omitempty"`
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -111,10 +111,10 @@ func (s *SmtpProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (i *Imap) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (i *ImapReceiver) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
-	*i = Imap{}
-	type plain Imap
+	*i = ImapReceiver{}
+	type plain ImapReceiver
 	if err := unmarshal((*plain)(i)); err != nil {
 		return err
 	}

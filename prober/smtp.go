@@ -92,7 +92,7 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 	registry.MustRegister(probeSmtpStatusCode)
 	registry.MustRegister(probeSmtpEnhancedStatusCode)
 
-	handleSmtpError := func(c *smtp.Client, err error, msg string) {
+	handleSmtpError := func(c *smtp.Client, err error, msg ...string) {
 
 		if c != nil {
 			// if target port is closed, a client was never created
@@ -180,10 +180,9 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 		}
 
 		if c == nil {
-			level.Info(logger).Log("error", "TODO:// this should not happend")
-			return nil, errors.New("TOO")
+			return nil, errors.New("could not create SMTP client")
 		}
-		level.Info(logger).Log("msg", "Successfully connected to smtp server", "server", targetIpPort, "tls", module.SMTP.TLS)
+		level.Info(logger).Log("msg", "Successfully connected to SMTP server", "server", targetIpPort, "tls", module.SMTP.TLS)
 		return c, nil
 	}
 
@@ -207,13 +206,14 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 
 	c, err := newSmtpClient(net.JoinHostPort(ip.String(), targetPort))
 	if err != nil {
-		handleSmtpError(c, err, "Error creating smtp client")
+		handleSmtpError(c, err, "Error creating SMTP client")
 		return result
 	}
 
 	defer func() {
 		probeSmtpStatusCode.Set(float64(statusCode))
 		probeSmtpEnhancedStatusCode.Set(float64(statusCodeEnhanced))
+		// fmt.Println(result.Commands.String())
 	}()
 
 	state, ok := c.TLSConnectionState()
@@ -232,22 +232,32 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 			handleSmtpError(c, err, "Error sending AUTH command")
 			return result
 		}
-		level.Info(logger).Log("msg", "Authentication was successful")
+		level.Info(logger).Log("msg", "SMTP authentication was successful")
 	} else {
 		level.Info(logger).Log("msg", "Skipping authentication (not configured)")
 	}
 
-	if err = c.Mail(module.SMTP.MailFrom, nil); err != nil {
-		handleSmtpError(c, err, "Error sending MAIL FROM command")
+	if len(module.SMTP.MailFrom) == 0 {
+		level.Error(logger).Log("msg", "MAIL FROM in module configuration is empty")
 		return result
 	}
-	level.Info(logger).Log("msg", "MAIL FROM command sent successfully")
+
+	if err = c.Mail(module.SMTP.MailFrom, nil); err != nil {
+		handleSmtpError(c, err, "Error sending MAIL FROM command", "from", module.SMTP.MailFrom)
+		return result
+	}
+	level.Info(logger).Log("msg", "MAIL FROM command sent successfully", "from", module.SMTP.MailFrom)
+
+	if len(module.SMTP.MailTo) == 0 {
+		level.Error(logger).Log("msg", "RCPT TO in module configuration is empty")
+		return result
+	}
 
 	if err = c.Rcpt(module.SMTP.MailTo); err != nil {
-		handleSmtpError(c, err, "Error sending RCPT TO command")
+		handleSmtpError(c, err, "Error sending RCPT TO command", "rcpt", module.SMTP.MailTo)
 		return result
 	}
-	level.Info(logger).Log("msg", "RCPT TO command sent successfully")
+	level.Info(logger).Log("msg", "RCPT TO command sent successfully", "rcpt", module.SMTP.MailTo)
 
 	w, err := c.Data()
 	if err != nil {
@@ -259,11 +269,11 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 	result.Subject = subject
 
 	if _, err = w.Write([]byte(message)); err != nil {
-		level.Error(logger).Log("msg", "Error sending email data ", "err", err)
+		level.Error(logger).Log("msg", "Error writing message buffer", "err", err)
 	}
 
 	if err = w.Close(); err != nil {
-		level.Error(logger).Log("msg", "Error closing the email buffer", "err", err)
+		level.Error(logger).Log("msg", "Error closing message buffer", "err", err)
 	}
 
 	if err = c.Quit(); err != nil {
@@ -271,11 +281,17 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 		return result
 	}
 
-	level.Info(logger).Log("msg", "Mail successfully sent", "subject", result.Subject)
+	level.Info(logger).Log("msg", "Message successfully sent", "subject", result.Subject)
 
-	result.Success = true
 	statusCode = 221
 	statusCodeEnhanced = 200
+
+	if len(module.SMTP.Receiver) == 0 {
+		result.Success = true
+	} else if module.SMTP.Receiver == "imap" {
+		success := ImapReceiver(ctx, result.Subject, module.SMTP.IMAP, registry, logger)
+		result.Success = success
+	}
 	return result
 }
 
@@ -296,15 +312,15 @@ func buildMessage(module config.Module) (string, string) {
 
 	headers := make(map[string]string)
 	for k, v := range module.SMTP.Headers {
-		headers[k] = v
+		headers[strings.Title(strings.ToLower(k))] = v
 	}
 
-	_, ok := headers["subject"]
+	_, ok := headers["Subject"]
 	if !ok {
-		headers["subject"] = "[smtp_exporter]"
+		headers["Subject"] = "[smtp_exporter]"
 	}
 
-	headers["subject"] = fmt.Sprintf("%s %s", headers["subject"], uuid.New().String())
+	headers["Subject"] = fmt.Sprintf("%s %s", headers["Subject"], uuid.New().String())
 	headers["Message-ID"] = generateMessageID()
 
 	// now := time.Now().Format("Tue, 6 Apr 2021 13:33:16 +0200")
@@ -321,5 +337,5 @@ func buildMessage(module config.Module) (string, string) {
 		message += fmt.Sprintf("%s: %s\r\n", k, v)
 	}
 	message += "\r\n" + body
-	return message, headers["subject"]
+	return message, headers["Subject"]
 }

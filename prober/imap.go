@@ -1,13 +1,13 @@
 package prober
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"net"
 	"net/mail"
 	"net/textproto"
+	"os"
 	"strings"
 	"time"
 
@@ -20,49 +20,49 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type ImapProberResult struct {
-	// Commands contains all imap commands sent/received by the mail server
-	Commands *bytes.Buffer
-	Success  bool
-}
+// type ImapProberResult struct {
+// 	// Commands contains all imap commands sent/received by the mail server
+// 	Commands *bytes.Buffer
+// 	Success  bool
+// }
 
-func (i *ImapProberResult) Write(p []byte) (int, error) {
-	// TODO: map this to imap
-	if strings.HasPrefix(string(p), "AUTH PLAIN") {
-		i.Commands.Write([]byte("AUTH PLAIN <secret>\r\n"))
-	} else {
-		i.Commands.Write(p)
-	}
-	return len(p), nil
+// func (i *ImapProberResult) Write(p []byte) (int, error) {
+// 	// TODO: map this to imap
+// 	if strings.HasPrefix(string(p), "AUTH PLAIN") {
+// 		i.Commands.Write([]byte("AUTH PLAIN <secret>\r\n"))
+// 	} else {
+// 		i.Commands.Write(p)
+// 	}
+// 	return len(p), nil
 
-}
+// }
 
-func (i *ImapProberResult) String() string {
-	return i.Commands.String()
-}
+// func (i *ImapProberResult) String() string {
+// 	return i.Commands.String()
+// }
 
-func ImapProber(ctx context.Context, subject string, module config.Module, registry *prometheus.Registry, logger log.Logger) ImapProberResult {
+func ImapReceiver(ctx context.Context, subject string, module config.ImapReceiver, registry *prometheus.Registry, logger log.Logger) (success bool) {
 
-	result := ImapProberResult{
-		Commands: &bytes.Buffer{},
-		Success:  false}
+	// result := ImapProberResult{
+	// 	Commands: &bytes.Buffer{},
+	// 	Success:  false}
 
 	newImapClient := func() (c *client.Client, err error) {
 
-		targetIpPort := net.JoinHostPort(module.IMAP.Server, fmt.Sprintf("%d", module.IMAP.Port))
-		level.Info(logger).Log("msg", "Connecting to imap server", "server", targetIpPort, "tls", module.IMAP.TLS)
+		targetIpPort := net.JoinHostPort(module.Server, fmt.Sprintf("%d", module.Port))
+		level.Info(logger).Log("msg", "Connecting to IMAP server", "server", targetIpPort, "tls", module.TLS)
 
-		if strings.EqualFold(module.IMAP.TLS, "no") ||
-			strings.EqualFold(module.IMAP.TLS, "starttls") {
+		if strings.EqualFold(module.TLS, "no") ||
+			strings.EqualFold(module.TLS, "starttls") {
 
 			c, err = client.Dial(targetIpPort)
 			if err != nil {
 				return nil, err
 			}
-			c.SetDebug(result.Commands)
+			// c.SetDebug(result.Commands)
 
-			if strings.EqualFold(module.IMAP.TLS, "starttls") {
-				tlsConfig, err := newTLSConfig(&module.IMAP.TLSConfig)
+			if strings.EqualFold(module.TLS, "starttls") {
+				tlsConfig, err := newTLSConfig(&module.TLSConfig)
 				if err != nil {
 					return nil, err
 				}
@@ -73,8 +73,8 @@ func ImapProber(ctx context.Context, subject string, module config.Module, regis
 			}
 		}
 
-		if strings.EqualFold(module.IMAP.TLS, "tls") {
-			tlsConfig, err := newTLSConfig(&module.IMAP.TLSConfig)
+		if strings.EqualFold(module.TLS, "tls") {
+			tlsConfig, err := newTLSConfig(&module.TLSConfig)
 			if err != nil {
 				return nil, err
 			}
@@ -83,11 +83,12 @@ func ImapProber(ctx context.Context, subject string, module config.Module, regis
 			if err != nil {
 				return nil, err
 			}
-			c.SetDebug(result.Commands)
+			// c.SetDebug(result.Commands)
+			c.SetDebug(os.Stdout)
 		}
 
 		if c == nil {
-			return nil, errors.New("smtp client object is still nil")
+			return nil, errors.New("could not create IMAP client")
 		}
 		level.Info(logger).Log("msg", "Successfully connected to IMAP server")
 		return c, nil
@@ -96,22 +97,22 @@ func ImapProber(ctx context.Context, subject string, module config.Module, regis
 	c, err := newImapClient()
 	if err != nil {
 		level.Error(logger).Log("msg", "Error connecting to IMAP server", "err", err)
-		return result
+		return
 	}
 
 	defer c.Logout()
 
-	if err := c.Login(module.IMAP.Auth.Username, string(module.IMAP.Auth.Password)); err != nil {
+	if err := c.Login(module.Auth.Username, string(module.Auth.Password)); err != nil {
 		level.Error(logger).Log("msg", "Error during IMAP login", "err", err)
-		return result
+		return
 	}
+	level.Error(logger).Log("msg", "IMAP authentication was successful")
 
 	done := make(chan error, 1)
-	if _, err = c.Select(module.IMAP.Mailbox, true); err != nil {
-		level.Error(logger).Log("msg", fmt.Sprintf("Error selecting mailbox %q", module.IMAP.Mailbox), "err", err)
-		return result
+	if _, err = c.Select(module.Mailbox, true); err != nil {
+		level.Error(logger).Log("msg", fmt.Sprintf("Error selecting mailbox %q", module.Mailbox), "err", err)
+		return
 	}
-
 	searchCriteria := imap.NewSearchCriteria()
 	filterHeaders := textproto.MIMEHeader{}
 	filterHeaders.Set("Subject", subject)
@@ -121,11 +122,11 @@ func ImapProber(ctx context.Context, subject string, module config.Module, regis
 	for {
 		if seq, err = c.Search(searchCriteria); err != nil {
 			level.Error(logger).Log("msg", "Error searching for messages", "err", err)
-			return result
+			return
 		}
 
 		if len(seq) == 0 {
-			level.Error(logger).Log("msg", "Message not found. Retry in a second", "mailbox", module.IMAP.Mailbox, "subject", subject)
+			level.Error(logger).Log("msg", "Message not yet found. Next retry in a second", "mailbox", module.Mailbox, "subject", subject)
 			time.Sleep(1 * time.Second)
 		} else {
 			break
@@ -145,25 +146,24 @@ func ImapProber(ctx context.Context, subject string, module config.Module, regis
 	go func() {
 		done <- c.Fetch(seqset, items, messages)
 	}()
-
 	msg := <-messages
 	r := msg.GetBody(section)
 	if r == nil {
-		level.Error(logger).Log("msg", "Server didn't returned message body", "err", err)
-		return result
+		level.Error(logger).Log("msg", "Server did not return message body", "err", err)
+		return
 	}
 
+	// BUG: wenn es zwei mails zu lesen gibt blocken wir hier, weil wir nur eine lesen!
 	if err := <-done; err != nil {
 		level.Error(logger).Log("msg", "Error fetching message", "err", err)
-		return result
+		return
 	}
 
 	m, err := mail.ReadMessage(r)
 	if err != nil {
 		level.Error(logger).Log("msg", "Could not read message", "err", err)
-		return result
+		return
 	}
-
 	// body, err := ioutil.ReadAll(m.Body)
 	// if err != nil {
 	// 	level.Error(logger).Log("msg", "Could not read body", "err", err)
@@ -172,8 +172,8 @@ func ImapProber(ctx context.Context, subject string, module config.Module, regis
 
 	// fmt.Printf("Body\n%s\n", body)
 
-	level.Info(logger).Log("msg", "Found previously sent mail in the mailbox", "subject", m.Header.Get("Subject"))
-	result.Success = true
+	level.Info(logger).Log("msg", "Found previously sent message in the mailbox", "subject", m.Header.Get("Subject"))
+	success = true
 
-	return result
+	return
 }
