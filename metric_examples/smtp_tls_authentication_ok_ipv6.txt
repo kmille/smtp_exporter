@@ -1,0 +1,97 @@
+Logs for the probe:
+ts=2021-04-22T06:06:59.754077406Z caller=main.go:324 module=smtp_tls_authentication_ok_ipv6 target=mail.darmstadt.ccc.de:465 level=info msg="Beginning probe" probe=smtp timeout_seconds=5
+ts=2021-04-22T06:06:59.754477114Z caller=smtp.go:196 module=smtp_tls_authentication_ok_ipv6 target=mail.darmstadt.ccc.de:465 level=info msg="Resolving target addreses" targetHost=mail.darmstadt.ccc.de ip_protocol=ip6
+ts=2021-04-22T06:06:59.756559224Z caller=smtp.go:196 module=smtp_tls_authentication_ok_ipv6 target=mail.darmstadt.ccc.de:465 level=info msg="Resolved target address" ip=2001:41b8:83f:4242::b182
+ts=2021-04-22T06:06:59.790119768Z caller=smtp.go:207 module=smtp_tls_authentication_ok_ipv6 target=mail.darmstadt.ccc.de:465 level=info msg="Successfully connected to SMTP server" server=[2001:41b8:83f:4242::b182]:465 tls=tls
+ts=2021-04-22T06:06:59.795813759Z caller=main.go:114 module=smtp_tls_authentication_ok_ipv6 target=mail.darmstadt.ccc.de:465 level=info msg="SMTP authentication was successful"
+ts=2021-04-22T06:06:59.80024551Z caller=main.go:114 module=smtp_tls_authentication_ok_ipv6 target=mail.darmstadt.ccc.de:465 level=info msg="MAIL FROM command sent successfully" from=kmille@darmstadt.ccc.de
+ts=2021-04-22T06:06:59.807880802Z caller=main.go:114 module=smtp_tls_authentication_ok_ipv6 target=mail.darmstadt.ccc.de:465 level=info msg="RCPT TO command sent successfully" rcpt=mail-test2@androidloves.me
+ts=2021-04-22T06:06:59.873536068Z caller=main.go:114 module=smtp_tls_authentication_ok_ipv6 target=mail.darmstadt.ccc.de:465 level=info msg="Message successfully sent" subject="mail-monitoring a62b3312-9942-4809-9e10-557df671e9b2"
+ts=2021-04-22T06:06:59.873714934Z caller=main.go:324 module=smtp_tls_authentication_ok_ipv6 target=mail.darmstadt.ccc.de:465 level=info msg="Probe succeeded" duration_seconds=0.119499587
+
+SMTP commands:
+EHLO smtp01.wurbz.de
+250-venus.chaos.hg.tu-darmstadt.de
+250-PIPELINING
+250-SIZE 10240000
+250-VRFY
+250-ETRN
+250-AUTH PLAIN
+250-ENHANCEDSTATUSCODES
+250-8BITMIME
+250-DSN
+250 CHUNKING
+AUTH PLAIN <secret>
+235 2.7.0 Authentication successful
+MAIL FROM:<kmille@darmstadt.ccc.de> BODY=8BITMIME
+250 2.1.0 Ok
+RCPT TO:<mail-test2@androidloves.me>
+250 2.1.5 Ok
+DATA
+354 End data with <CR><LF>.<CR><LF>
+From: kmille@darmstadt.ccc.de
+To: mail-test2@androidloves.me
+Subject: mail-monitoring a62b3312-9942-4809-9e10-557df671e9b2
+Message-ID: <1619071619812599851.938458.2097350632842975858@linbox>
+Date: Wed, 07 Apr 22224 48:598:86
+
+This mail was sent over ipv6
+.
+250 2.0.0 Ok: queued as 662604449
+QUIT
+221 2.0.0 Bye
+
+
+Metrics that would have been returned:
+# HELP probe_dns_lookup_time_seconds Returns the time taken for probe dns lookup in seconds
+# TYPE probe_dns_lookup_time_seconds gauge
+probe_dns_lookup_time_seconds 0.002171049
+# HELP probe_duration_seconds Returns how long the probe took to complete in seconds
+# TYPE probe_duration_seconds gauge
+probe_duration_seconds 0.119499587
+# HELP probe_ip_addr_hash Specifies the hash of IP address. It's useful to detect if the IP address changes.
+# TYPE probe_ip_addr_hash gauge
+probe_ip_addr_hash 2.496961925e+09
+# HELP probe_ip_protocol Specifies wether probe ip protocol IP4 or IP6
+# TYPE probe_ip_protocol gauge
+probe_ip_protocol 6
+# HELP probe_smtp_enhanced_status_code Response smtp enhanced status code
+# TYPE probe_smtp_enhanced_status_code gauge
+probe_smtp_enhanced_status_code 200
+# HELP probe_smtp_status_code Response smtp status code
+# TYPE probe_smtp_status_code gauge
+probe_smtp_status_code 221
+# HELP probe_smtp_tls Indicates if TLS was used
+# TYPE probe_smtp_tls gauge
+probe_smtp_tls 1
+# HELP probe_success Displays whether or not the probe was a success
+# TYPE probe_success gauge
+probe_success 1
+# HELP probe_tls_cert_expire Returns the TLS cert expire in unixtime
+# TYPE probe_tls_cert_expire gauge
+probe_tls_cert_expire 1.625951147e+09
+# HELP probe_tls_info Contains certificate information
+# TYPE probe_tls_info gauge
+probe_tls_info{fingerprint_sha256="41f3c2265b9260febbaa35144096ff45a2cf7f98aa8bde4f53ba8f10944a75b5"} 1
+# HELP probe_tls_version_info Contains the TLS version used
+# TYPE probe_tls_version_info gauge
+probe_tls_version_info{version="TLS 1.3"} 1
+
+
+
+Module configuration:
+prober: smtp
+smtp:
+  preferred_ip_protocol: ip6
+  tls: tls
+  auth:
+    username: kmille
+    password: <secret>
+  ehlo: smtp01.wurbz.de
+  mail_from: kmille@darmstadt.ccc.de
+  mail_to: mail-test2@androidloves.me
+  headers:
+    from: kmille@darmstadt.ccc.de
+    subject: mail-monitoring
+    to: mail-test2@androidloves.me
+  body: This mail was sent over ipv6

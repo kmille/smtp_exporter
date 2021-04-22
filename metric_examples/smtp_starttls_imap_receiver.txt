@@ -1,0 +1,120 @@
+Logs for the probe:
+ts=2021-04-22T06:58:10.643465834Z caller=main.go:324 module=smtp_starttls_imap_receiver target=beeftraeger.wurbz.de:587 level=info msg="Beginning probe" probe=smtp timeout_seconds=5
+ts=2021-04-22T06:58:10.643614815Z caller=smtp.go:196 module=smtp_starttls_imap_receiver target=beeftraeger.wurbz.de:587 level=info msg="Resolving target addreses" targetHost=beeftraeger.wurbz.de ip_protocol=ip4
+ts=2021-04-22T06:58:10.644008413Z caller=smtp.go:196 module=smtp_starttls_imap_receiver target=beeftraeger.wurbz.de:587 level=info msg="Resolved target address" ip=138.201.174.101
+ts=2021-04-22T06:58:10.712164038Z caller=smtp.go:207 module=smtp_starttls_imap_receiver target=beeftraeger.wurbz.de:587 level=info msg="Successfully connected to SMTP server" server=138.201.174.101:587 tls=starttls
+ts=2021-04-22T06:58:10.737378098Z caller=main.go:114 module=smtp_starttls_imap_receiver target=beeftraeger.wurbz.de:587 level=info msg="SMTP authentication was successful"
+ts=2021-04-22T06:58:10.746585395Z caller=main.go:114 module=smtp_starttls_imap_receiver target=beeftraeger.wurbz.de:587 level=info msg="MAIL FROM command sent successfully" from=mail-test1@androidloves.me
+ts=2021-04-22T06:58:10.756844283Z caller=main.go:114 module=smtp_starttls_imap_receiver target=beeftraeger.wurbz.de:587 level=info msg="RCPT TO command sent successfully" rcpt=mail-test2@androidloves.me
+ts=2021-04-22T06:58:10.838531487Z caller=main.go:114 module=smtp_starttls_imap_receiver target=beeftraeger.wurbz.de:587 level=info msg="Message successfully sent" subject="[smtp_exporter] 7d91f0f7-6a95-4617-aa49-2f16e8db998f"
+ts=2021-04-22T06:58:10.838701707Z caller=imap.go:96 module=smtp_starttls_imap_receiver target=beeftraeger.wurbz.de:587 level=info msg="Connecting to IMAP server" server=beeftraeger.wurbz.de:993 tls=tls
+ts=2021-04-22T06:58:10.926390553Z caller=imap.go:96 module=smtp_starttls_imap_receiver target=beeftraeger.wurbz.de:587 level=info msg="Successfully connected to IMAP server"
+ts=2021-04-22T06:58:10.947162958Z caller=smtp.go:292 module=smtp_starttls_imap_receiver target=beeftraeger.wurbz.de:587 level=error msg="IMAP authentication was successful"
+ts=2021-04-22T06:58:10.976594287Z caller=smtp.go:292 module=smtp_starttls_imap_receiver target=beeftraeger.wurbz.de:587 level=info msg="Found previously sent message in the mailbox" subject="[smtp_exporter] 7d91f0f7-6a95-4617-aa49-2f16e8db998f"
+ts=2021-04-22T06:58:10.986058878Z caller=main.go:324 module=smtp_starttls_imap_receiver target=beeftraeger.wurbz.de:587 level=info msg="Probe succeeded" duration_seconds=0.342526585
+
+SMTP commands:
+EHLO localhost
+250-beeftraeger.wurbz.de
+250-PIPELINING
+250-SIZE 20480000
+250-VRFY
+250-ETRN
+250-STARTTLS
+250-ENHANCEDSTATUSCODES
+250 8BITMIME
+STARTTLS
+220 2.0.0 Ready to start TLS
+EHLO localhost
+250-beeftraeger.wurbz.de
+250-PIPELINING
+250-SIZE 20480000
+250-VRFY
+250-ETRN
+250-AUTH PLAIN LOGIN
+250-ENHANCEDSTATUSCODES
+250 8BITMIME
+AUTH PLAIN <secret>
+235 2.7.0 Authentication successful
+MAIL FROM:<mail-test1@androidloves.me> BODY=8BITMIME
+250 2.1.0 Ok
+RCPT TO:<mail-test2@androidloves.me>
+250 2.1.5 Ok
+DATA
+354 End data with <CR><LF>.<CR><LF>
+From: mail-test1@androidloves.me
+To: mail-test2@androidloves.me
+Subject: [smtp_exporter] 7d91f0f7-6a95-4617-aa49-2f16e8db998f
+Message-ID: <1619074690766664472.942202.3274510131031510362@linbox>
+Date: Wed, 07 Apr 22224 48:108:858
+
+This is a test mail sent by the smtp_exporter
+.
+250 2.0.0 Ok: queued as 552392E345
+QUIT
+221 2.0.0 Bye
+
+
+Metrics that would have been returned:
+# HELP probe_dns_lookup_time_seconds Returns the time taken for probe dns lookup in seconds
+# TYPE probe_dns_lookup_time_seconds gauge
+probe_dns_lookup_time_seconds 0.000419518
+# HELP probe_duration_seconds Returns how long the probe took to complete in seconds
+# TYPE probe_duration_seconds gauge
+probe_duration_seconds 0.342526585
+# HELP probe_ip_addr_hash Specifies the hash of IP address. It's useful to detect if the IP address changes.
+# TYPE probe_ip_addr_hash gauge
+probe_ip_addr_hash 2.028204543e+09
+# HELP probe_ip_protocol Specifies wether probe ip protocol IP4 or IP6
+# TYPE probe_ip_protocol gauge
+probe_ip_protocol 4
+# HELP probe_smtp_enhanced_status_code Response smtp enhanced status code
+# TYPE probe_smtp_enhanced_status_code gauge
+probe_smtp_enhanced_status_code 200
+# HELP probe_smtp_status_code Response smtp status code
+# TYPE probe_smtp_status_code gauge
+probe_smtp_status_code 221
+# HELP probe_smtp_tls Indicates if TLS was used
+# TYPE probe_smtp_tls gauge
+probe_smtp_tls 1
+# HELP probe_success Displays whether or not the probe was a success
+# TYPE probe_success gauge
+probe_success 1
+# HELP probe_tls_cert_expire Returns the TLS cert expire in unixtime
+# TYPE probe_tls_cert_expire gauge
+probe_tls_cert_expire 1.625822828e+09
+# HELP probe_tls_info Contains certificate information
+# TYPE probe_tls_info gauge
+probe_tls_info{fingerprint_sha256="84423b45e6aa73b3924076397c4ae745471c04672264f2727653797ccb6a4f95"} 1
+# HELP probe_tls_version_info Contains the TLS version used
+# TYPE probe_tls_version_info gauge
+probe_tls_version_info{version="TLS 1.2"} 1
+
+
+
+Module configuration:
+prober: smtp
+smtp:
+  preferred_ip_protocol: ip4
+  tls: starttls
+  auth:
+    username: mail-test1@androidloves.me
+    password: <secret>
+  ehlo: localhost
+  mail_from: mail-test1@androidloves.me
+  mail_to: mail-test2@androidloves.me
+  headers:
+    from: mail-test1@androidloves.me
+    to: mail-test2@androidloves.me
+  receiver: imap
+  imap:
+    tls: tls
+    tls_config:
+      server_name: beeftraeger.wurbz.de
+      insecure_skip_verify: false
+    auth:
+      username: mail-test2@androidloves.me
+      password: <secret>
+    server: beeftraeger.wurbz.de
+    port: 993
+    mailbox: INBOX
