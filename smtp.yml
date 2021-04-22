@@ -1,18 +1,112 @@
 modules:
-  smtp_auth:
+  smtp_starttls_authentication_ok:
     prober: smtp
-    timeout: 5m
     smtp:
       preferred_ip_protocol: ip4
-      ip_protocol_fallback: false
-      tls: no
-      tls_config:
-        insecure_skip_verify: false
-        server_name: blubb
+      tls: starttls
       auth:
-        username: user
-        password: pass
-      helo: hello123
-        #email:
-        #from: christian.schneider@androidloves.me
-        #to: test123@androidloves.me
+           username: mail-test1@androidloves.me
+           password: mail-test1-password
+      headers:
+        from: mail-test1@androidloves.me
+        to: mail-test2@androidloves.me
+  
+
+  smtp_tls_authentication_ok_ipv6:
+    prober: smtp
+    smtp:
+      preferred_ip_protocol: ip6
+      ip_protocol_fallback: false
+      tls: tls
+      ehlo: smtp01.wurbz.de
+      mail_from: kmille@darmstadt.ccc.de
+      mail_to: mail-test2@androidloves.me
+      auth:
+           username: kmille
+           password: ccc-password
+      headers:
+        from: kmille@darmstadt.ccc.de
+        to: mail-test2@androidloves.me
+        subject: mail-monitoring
+      body: This mail was sent over ipv6
+
+
+  smtp_tls_authentication_wrong:
+    prober: smtp
+    smtp:
+      tls: tls
+      auth:
+        username: mail-test1@androidloves.me
+        password: thisisnotavalidpassword
+      valid_status_codes:
+      - 535
+  
+
+  smtp_plain_authentication_not_available:
+    prober: smtp
+    smtp:
+      auth:
+        username: mail-test1@androidloves.me
+        password: thiswontwork
+      valid_status_codes:
+      - 530
+
+
+  smtp_starttls_auth_ok_forged_from:
+    prober: smtp
+    smtp:
+      tls: starttls
+      auth:
+           username: mail-test1@androidloves.me
+           password: mail-test1-password
+      headers:
+        from: angela@merkel.de
+        to: test123@androidloves.me
+        subject: test message
+      body: I'm not authenticated to write emails as this user
+      valid_status_codes:
+      - 553
+ 
+ 
+  smtp_starttls_open_relay:
+    prober: smtp
+    smtp:
+      tls: starttls
+      headers:
+        from: mail-test1@androidloves.me
+        to: test@google.de
+      body: This mail should be rejected because we are not authenticated.
+      valid_status_codes:
+      - 454
+
+ 
+  smtp_starttls_spam_message_rejected:
+    prober: smtp
+    smtp:
+      headers:
+        from: angela@google.com
+        to: mail-test2@androidloves.me
+      body: This mail should be rejected because the we are not authorized to send mail as google.com
+      valid_status_codes:
+      - 554
+  
+  smtp_starttls_imap_receiver:
+    prober: smtp
+    smtp:
+      preferred_ip_protocol: ip4
+      tls: starttls
+      auth:
+           username: mail-test1@androidloves.me
+           password: mail-test1-password
+      headers:
+        from: mail-test1@androidloves.me
+        to: mail-test2@androidloves.me
+      receiver: imap
+      imap:
+        tls: tls
+        auth:
+             username: mail-test2@androidloves.me
+             password: mail-test1-password
+        mailbox: INBOX
+        server: beeftraeger.wurbz.de
+        port: 993
