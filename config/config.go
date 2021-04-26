@@ -52,12 +52,18 @@ type Module struct {
 }
 
 type ImapReceiver struct {
-	TLS       string           `yaml:"tls,omitempty"`
-	TLSConfig config.TLSConfig `yaml:"tls_config,omitempty"`
-	Auth      SMTPAuth         `yaml:"auth,omitempty"`
-	Server    string           `yaml:"server,omitempty"`
-	Port      int              `yaml:"port,omitempty"`
-	Mailbox   string           `yaml:"mailbox,omitempty"`
+	TLS                   string           `yaml:"tls,omitempty"`
+	TLSConfig             config.TLSConfig `yaml:"tls_config,omitempty"`
+	Auth                  SMTPAuth         `yaml:"auth,omitempty"`
+	Server                string           `yaml:"server,omitempty"`
+	Port                  int              `yaml:"port,omitempty"`
+	Mailbox               string           `yaml:"mailbox,omitempty"`
+	ValidSPFResult        string           `yaml:"valid_spf_result,omitempty"`
+	ValidDKIMResult       string           `yaml:"valid_dkim_result,omitempty"`
+	ValidDMARCResult      string           `yaml:"valid_dmarc_result,omitempty"`
+	FailIfSPFNotMatches   bool             `yaml:"fail_if_spf_not_matches,omitempty"`
+	FailIfDKIMNotMatches  bool             `yaml:"fail_if_dkim_not_matches,omitempty"`
+	FailIfDMARCNotMatches bool             `yaml:"fail_if_dmarc_not_matches,omitempty"`
 }
 
 type SmtpProbe struct {
@@ -113,6 +119,7 @@ func (s *SmtpProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (i *ImapReceiver) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
+	//FailIfSPFNotMatches, FailIfDKIMNotMatches and FailIfDMARCNotMatches defaults to false
 	*i = ImapReceiver{}
 	type plain ImapReceiver
 	if err := unmarshal((*plain)(i)); err != nil {
@@ -144,6 +151,17 @@ func (i *ImapReceiver) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		i.TLSConfig.ServerName = i.Server
 	}
 
+	if len(i.ValidSPFResult) == 0 {
+		i.ValidSPFResult = "pass"
+	}
+
+	if len(i.ValidDKIMResult) == 0 {
+		i.ValidDKIMResult = "pass"
+	}
+
+	if len(i.ValidDMARCResult) == 0 {
+		i.ValidDMARCResult = "pass"
+	}
 	return nil
 }
 

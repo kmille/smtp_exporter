@@ -6,10 +6,10 @@ modules:
       tls: starttls
       auth:
            username: mail-test1@androidloves.me
-           password: mail-test1-password
+           password: password
       headers:
         from: mail-test1@androidloves.me
-        to: mail-test2@androidloves.me
+        to: dkim@androidloves.me
   
 
   smtp_tls_authentication_ok_ipv6:
@@ -94,19 +94,21 @@ modules:
     prober: smtp
     smtp:
       preferred_ip_protocol: ip4
-      tls: starttls
+      tls: tls
       auth:
-           username: mail-test1@androidloves.me
-           password: mail-test1-password
+           username: kmille
+           password: password
       headers:
-        from: mail-test1@androidloves.me
+        from: kmille@darmstadt.ccc.de
         to: mail-test2@androidloves.me
       receiver: imap
       imap:
-        tls: tls
-        auth:
-             username: mail-test2@androidloves.me
-             password: mail-test1-password
-        mailbox: INBOX
         server: beeftraeger.wurbz.de
         port: 993
+        tls: tls
+        mailbox: INBOX
+        auth:
+           username: mail-test2@androidloves.me
+           password: password
+        valid_spf_result: blubb
+        fail_if_spf_not_matches: true

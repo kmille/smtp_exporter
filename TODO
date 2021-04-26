@@ -1,5 +1,5 @@
 TODOs
-- add more checks for the imap receiver (Authentication-Results header, DKIM, DMARC)
+- logging: check caller=main.go:123 output
 - implement the smtpd receiver
     - add additional checks(SPF, DNS records, blacklisted)
 - implement TimeoutsTimeouts/Context?
@@ -10,8 +10,6 @@ TODOs
     - test the timeouts
 - add a simple SPF prober
 - BUG: starttls does not work with imap?
-- Bug: using target=smtp.gmail.com:465 with TLS
-    "err":"could not connect to target: x509: cannot validate certificate for 2a00:1450:4013:c00::6c because it doesn't contain any IP SANs","level":"debug","module":"smtp_auth","msg":["Error creating SMTP client"],"target":"smtp.gmail.com:465"
 - add a Makefile
     - add variables like Verision, Release, etc
 - add a proper licence
