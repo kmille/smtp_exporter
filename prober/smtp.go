@@ -143,7 +143,7 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 			if err != nil {
 				return nil, err
 			}
-			c.DebugWriter = result.Commands
+			c.DebugWriter = &result
 
 			if err = ehlo(c, module); err != nil {
 				return nil, err
@@ -162,24 +162,24 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 
 		if strings.EqualFold(module.SMTP.TLS, "tls") {
 
-			var d tls.Dialer
-			conn, err := d.DialContext(ctx, "tcp", targetIpPort)
-			if err != nil {
-				return nil, fmt.Errorf("could not connect to target: %s", err)
-			}
-
 			tlsConfig, err := newTLSConfig(&module.SMTP.TLSConfig)
 			if err != nil {
 				return nil, err
 			}
+
+			var d tls.Dialer
 			d.Config = tlsConfig
+			conn, err := d.DialContext(ctx, "tcp", targetIpPort)
+			if err != nil {
+				return nil, fmt.Errorf("could not connect to target: %s", err)
+			}
 
 			c, err = smtp.NewClient(conn, "")
 			if err != nil {
 				return nil, err
 			}
 
-			c.DebugWriter = result.Commands
+			c.DebugWriter = &result
 			if err = ehlo(c, module); err != nil {
 				return nil, err
 			}
