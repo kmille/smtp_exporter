@@ -100,7 +100,7 @@ func (s *SmtpProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 	r, _ := regexp.Compile(`^(no|starttls|tls)$`)
 	if !r.MatchString(s.TLS) {
-		return fmt.Errorf("smtp prober: tls value must be a an empty string (implicit no) or no|starttls|tls. Found: %q", s.TLS)
+		return fmt.Errorf("tls value must be a an empty string (implicit no) or no|starttls|tls. prober=smtp tls=%s", s.TLS)
 	}
 
 	if len(s.EHLO) == 0 {
@@ -120,11 +120,11 @@ func (i *ImapReceiver) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	}
 
 	if len(i.Server) == 0 {
-		return fmt.Errorf("imap prober: server must not be empty. Found: %q", i.Server)
+		return fmt.Errorf("IMAP server must not be empty. server='%s'", i.Server)
 	}
 
 	if i.Port == 0 {
-		return fmt.Errorf("imap prober: port must not be empty. Found: %q", i.Port)
+		return fmt.Errorf("IMAP port must not be empty. port='%d'", i.Port)
 	}
 
 	if len(i.Mailbox) == 0 {
@@ -137,7 +137,7 @@ func (i *ImapReceiver) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 	r, _ := regexp.Compile(`^(no|starttls|tls)$`)
 	if !r.MatchString(i.TLS) {
-		return fmt.Errorf("imap prober: tls value must be a an empty string (implicit no) or no|starttls|tls. Found: %q", i.TLS)
+		return fmt.Errorf("tls value must be a an empty string (implicit no) or no|starttls|tls. prober=smtp tls=%s", i.TLS)
 	}
 
 	if len(i.TLSConfig.ServerName) == 0 {
@@ -166,13 +166,11 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 	decoder.KnownFields(true)
 
 	if err = decoder.Decode(c); err != nil {
-		return fmt.Errorf("error parsing config file: %s", err)
+		return err
 	}
 
 	sc.Lock()
 	sc.C = c
 	sc.Unlock()
-	// fmt.Printf("%v", c)
-
 	return nil
 }

@@ -1,6 +1,4 @@
 TODOs
-- ugly debug print - remove escaped qutoes
-    level=error ts=2021-04-19T15:35:19.912Z caller=main.go:227 msg="Error loading config" err="error parsing config file: imap prober: server must not be empty. Found: \"\""
 - the date format is completely broken right now
 - add more checks for the imap receiver (Authentication-Results header, DKIM, DMARC)
 - implement the smtpd receiver
