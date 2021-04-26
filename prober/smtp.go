@@ -322,15 +322,7 @@ func buildMessage(module config.Module) (string, string) {
 
 	headers["Subject"] = fmt.Sprintf("%s %s", headers["Subject"], uuid.New().String())
 	headers["Message-ID"] = generateMessageID()
-
-	// now := time.Now().Format("Tue, 6 Apr 2021 13:33:16 +0200")
-	// now := time.Now().Format("Mon, Jan 2 15:04:05 MST 2006")
-	now := time.Now().Format("Wed, 07 Apr 2021 13:53:34")
-	// TODO: get the date format right oO
-	// https://tools.ietf.org/html/rfc2822#section-3.3
-
-	headers["Date"] = now
-	// fmt.Println(now)
+	headers["Date"] = time.Now().Format("Mon, _2 Jan 2006 15:04:05 -0700")
 
 	message := ""
 	for k, v := range headers {

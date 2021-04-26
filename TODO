@@ -1,5 +1,4 @@
 TODOs
-- the date format is completely broken right now
 - add more checks for the imap receiver (Authentication-Results header, DKIM, DMARC)
 - implement the smtpd receiver
     - add additional checks(SPF, DNS records, blacklisted)
