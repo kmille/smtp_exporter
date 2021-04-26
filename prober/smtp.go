@@ -48,6 +48,11 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 		statusCode         int
 		statusCodeEnhanced int
 
+		probeMessageSent = prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "probe_message_sent",
+			Help: "Indicates if the message was sent successfully",
+		})
+
 		probeTLSVersion = prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "probe_tls_version_info",
@@ -87,6 +92,7 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 		Commands: &bytes.Buffer{},
 		Success:  false}
 
+	registry.MustRegister(probeMessageSent)
 	registry.MustRegister(probeIsTLSGauge)
 	registry.MustRegister(probeTLSCertExpireGauge)
 	registry.MustRegister(probeSmtpStatusCode)
@@ -282,7 +288,8 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 	}
 
 	level.Info(logger).Log("msg", "Message successfully sent", "subject", result.Subject)
-
+	probeMessageSent.Set(1)
+	// go-smtp doesn't give us access to the statusCode/statusCodeEnhanced if transmission succeeds
 	statusCode = 221
 	statusCodeEnhanced = 200
 
