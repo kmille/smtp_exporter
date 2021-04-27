@@ -25,6 +25,24 @@ var (
 		Name:      "config_last_reload_success_timestamp_seconds",
 		Help:      "Timestamp of the last successful configuration reload.",
 	})
+
+	DefaultSmtpProbe = SMTPProbe{
+		IPProtocol:         "ip6",
+		IPProtocolFallback: true,
+		EHLO:               "localhost",
+		TLS:                "no",
+	}
+
+	DefaultIMAPReceiver = IMAPReceiver{
+		TLS:                   "no",
+		Mailbox:               "INBOX",
+		ValidSPFResult:        "pass",
+		ValidDKIMResult:       "pass",
+		ValidDMARCResult:      "pass",
+		FailIfSPFNotMatches:   false,
+		FailIfDKIMNotMatches:  false,
+		FailIfDMARCNotMatches: false,
+	}
 )
 
 func init() {
@@ -48,10 +66,10 @@ type SMTPAuth struct {
 type Module struct {
 	Prober  string        `yaml:"prober"`
 	Timeout time.Duration `yaml:"timeout,omitempty"`
-	SMTP    SmtpProbe     `yaml:"smtp,omitempty"`
+	SMTP    SMTPProbe     `yaml:"smtp,omitempty"`
 }
 
-type ImapReceiver struct {
+type IMAPReceiver struct {
 	TLS                   string           `yaml:"tls,omitempty"`
 	TLSConfig             config.TLSConfig `yaml:"tls_config,omitempty"`
 	Auth                  SMTPAuth         `yaml:"auth,omitempty"`
@@ -66,7 +84,7 @@ type ImapReceiver struct {
 	FailIfDMARCNotMatches bool             `yaml:"fail_if_dmarc_not_matches,omitempty"`
 }
 
-type SmtpProbe struct {
+type SMTPProbe struct {
 	IPProtocol         string            `yaml:"preferred_ip_protocol,omitempty"`
 	IPProtocolFallback bool              `yaml:"ip_protocol_fallback,omitempty"`
 	TLS                string            `yaml:"tls,omitempty"`
@@ -79,49 +97,44 @@ type SmtpProbe struct {
 	Body               string            `yaml:"body,omitempty"`
 	ValidStatusCodes   []int             `yaml:"valid_status_codes,omitempty"`
 	Receiver           string            `yaml:"receiver,omitempty"`
-	IMAP               ImapReceiver      `yaml:"imap,omitempty"`
+	IMAP               IMAPReceiver      `yaml:"imap,omitempty"`
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (s *SmtpProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*s = SmtpProbe{}
-	type plain SmtpProbe
+func (s *SMTPProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*s = DefaultSmtpProbe
+	type plain SMTPProbe
 	if err := unmarshal((*plain)(s)); err != nil {
 		return err
 	}
 
+	r, _ := regexp.Compile(`^(ip4|ip6)$`)
+	if !r.MatchString(s.IPProtocol) {
+		return fmt.Errorf("preferred_ip_protocol value must be ip4 or ip6. prober=smtp preferred_ip_protocol=%s", s.IPProtocol)
+	}
+
 	if len(s.MailFrom) == 0 {
-		// TODO: encorce a non-emtpy from header?
 		s.MailFrom = s.Headers["from"]
 	}
 
 	if len(s.MailTo) == 0 {
-		// TODO: encorce a non-emtpy to header?
 		s.MailTo = s.Headers["to"]
 	}
 
-	if len(s.TLS) == 0 {
-		s.TLS = "no"
-	}
-
-	r, _ := regexp.Compile(`^(no|starttls|tls)$`)
+	r, _ = regexp.Compile(`^(no|starttls|tls)$`)
 	if !r.MatchString(s.TLS) {
 		return fmt.Errorf("tls value must be a an empty string (implicit no) or no|starttls|tls. prober=smtp tls=%s", s.TLS)
-	}
-
-	if len(s.EHLO) == 0 {
-		s.EHLO = "localhost"
 	}
 
 	return nil
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (i *ImapReceiver) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (i *IMAPReceiver) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 	//FailIfSPFNotMatches, FailIfDKIMNotMatches and FailIfDMARCNotMatches defaults to false
-	*i = ImapReceiver{}
-	type plain ImapReceiver
+	*i = DefaultIMAPReceiver
+	type plain IMAPReceiver
 	if err := unmarshal((*plain)(i)); err != nil {
 		return err
 	}
@@ -134,14 +147,6 @@ func (i *ImapReceiver) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		return fmt.Errorf("IMAP port must not be empty. port='%d'", i.Port)
 	}
 
-	if len(i.Mailbox) == 0 {
-		i.Mailbox = "INBOX"
-	}
-
-	if len(i.TLS) == 0 {
-		i.TLS = "no"
-	}
-
 	r, _ := regexp.Compile(`^(no|starttls|tls)$`)
 	if !r.MatchString(i.TLS) {
 		return fmt.Errorf("tls value must be a an empty string (implicit no) or no|starttls|tls. prober=smtp tls=%s", i.TLS)
@@ -151,17 +156,6 @@ func (i *ImapReceiver) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		i.TLSConfig.ServerName = i.Server
 	}
 
-	if len(i.ValidSPFResult) == 0 {
-		i.ValidSPFResult = "pass"
-	}
-
-	if len(i.ValidDKIMResult) == 0 {
-		i.ValidDKIMResult = "pass"
-	}
-
-	if len(i.ValidDMARCResult) == 0 {
-		i.ValidDMARCResult = "pass"
-	}
 	return nil
 }
 

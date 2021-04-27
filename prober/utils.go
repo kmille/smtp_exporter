@@ -43,7 +43,7 @@ func chooseProtocol(ctx context.Context, IPProtocol string, fallbackIPProtocol b
 	registry.MustRegister(probeDNSLookupTimeSeconds)
 	registry.MustRegister(probeIPAddrHash)
 
-	if IPProtocol == "ip6" || IPProtocol == "" {
+	if IPProtocol == "ip6" {
 		IPProtocol = "ip6"
 		fallbackProtocol = "ip4"
 	} else {

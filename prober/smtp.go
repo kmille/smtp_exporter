@@ -296,7 +296,7 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 	if len(module.SMTP.Receiver) == 0 {
 		result.Success = true
 	} else if module.SMTP.Receiver == "imap" {
-		success := ImapReceiver(ctx, result.Subject, module.SMTP.IMAP, registry, logger)
+		success := IMAPReceiver(ctx, result.Subject, module.SMTP.IMAP, registry, logger)
 		result.Success = success
 	}
 	return result

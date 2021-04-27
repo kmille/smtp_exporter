@@ -63,7 +63,7 @@ var (
 // 	return i.Commands.String()
 // }
 
-func ImapReceiver(ctx context.Context, subject string, module config.ImapReceiver, registry *prometheus.Registry, logger log.Logger) (success bool) {
+func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceiver, registry *prometheus.Registry, logger log.Logger) (success bool) {
 
 	registry.MustRegister(probeMessageReceived)
 	registry.MustRegister(probeSPFSuccess)

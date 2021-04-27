@@ -18,7 +18,7 @@ var c = &config.Config{
 		"smtp_auth": config.Module{
 			Prober:  "smtp",
 			Timeout: 10 * time.Second,
-			SMTP: config.SmtpProbe{
+			SMTP: config.SMTPProbe{
 				TLS: "tls",
 				Auth: config.SMTPAuth{
 					Username: "example@gmail.com",
