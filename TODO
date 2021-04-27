@@ -1,8 +1,10 @@
 TODOs
+- find a better error message (where does this come from?):
+ts=2021-04-27T14:01:01.237Z caller=main.go:170 module=smtp_starttls_authentication_ok target=localhost:25 level=debug msg="unsupported value type" err="read tcp 127.0.0.1:39450->127.0.0.1:25: i/o timeout"
+
 - logging: check caller=main.go:123 output
 - implement the smtpd receiver
     - add additional checks(SPF, DNS records, blacklisted)
-- implement TimeoutsTimeouts/Context?
 - metrics for durations
         - DNS is already working
     - interesting: how long does it take to receive the mail 

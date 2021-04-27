@@ -128,21 +128,28 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 		}
 	}
 
-	newSmtpClient := func(targetIpPort string) (c *smtp.Client, err error) {
+	newSMTPClient := func(targetIpPort string) (c *smtp.Client, err error) {
 
 		if strings.EqualFold(module.SMTP.TLS, "no") ||
 			strings.EqualFold(module.SMTP.TLS, "starttls") {
 
 			var d net.Dialer
+			// BUG: tcp or tcp6
 			conn, err := d.DialContext(ctx, "tcp", targetIpPort)
 			if err != nil {
 				return nil, fmt.Errorf("could not connect to target: %s", err)
+			}
+
+			deadline, _ := ctx.Deadline()
+			if err = conn.SetDeadline(deadline); err != nil {
+				return nil, err
 			}
 
 			c, err = smtp.NewClient(conn, "")
 			if err != nil {
 				return nil, err
 			}
+
 			c.DebugWriter = &result
 
 			if err = ehlo(c, module); err != nil {
@@ -172,6 +179,11 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 			conn, err := d.DialContext(ctx, "tcp", targetIpPort)
 			if err != nil {
 				return nil, fmt.Errorf("could not connect to target: %s", err)
+			}
+
+			deadline, _ := ctx.Deadline()
+			if err = conn.SetDeadline(deadline); err != nil {
+				return nil, err
 			}
 
 			c, err = smtp.NewClient(conn, "")
@@ -210,7 +222,7 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 		module.SMTP.TLSConfig.ServerName = targetHost
 	}
 
-	c, err := newSmtpClient(net.JoinHostPort(ip.String(), targetPort))
+	c, err := newSMTPClient(net.JoinHostPort(ip.String(), targetPort))
 	if err != nil {
 		handleSmtpError(c, err, "Error creating SMTP client")
 		return result
