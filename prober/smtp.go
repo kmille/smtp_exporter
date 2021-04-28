@@ -45,8 +45,8 @@ func (s *SmtpProberResult) String() string {
 func SmtpProber(ctx context.Context, target string, module config.Module, registry *prometheus.Registry, logger log.Logger) SmtpProberResult {
 
 	var (
-		statusCode         int
-		statusCodeEnhanced int
+		statusCode         = -1
+		statusCodeEnhanced = -1
 
 		probeMessageSent = prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "probe_message_sent",
@@ -98,25 +98,16 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 	registry.MustRegister(probeSmtpStatusCode)
 	registry.MustRegister(probeSmtpEnhancedStatusCode)
 
-	handleSmtpError := func(c *smtp.Client, err error, msg ...string) {
-
-		if c != nil {
-			// if target port is closed, a client was never created
-			if closeErr := c.Close(); closeErr != nil {
-				level.Error(logger).Log("msg", "Error closing the connection", "err", err)
-			}
-		}
-
-		smtpErr, ok := err.(*smtp.SMTPError)
-		if !ok {
-			// this is the case if we speak TLS to a non tls port
-			level.Error(logger).Log("msg", msg, "err", err)
-			statusCode = -1
-			statusCodeEnhanced = -1
-			return
-		}
+	handleSMTPError := func(c *smtp.Client, err error, msg ...string) {
+		smtpErr, _ := err.(*smtp.SMTPError)
+		// smtpErr, ok := err.(*smtp.SMTPError)
+		// if !ok {
+		// 	// this is the case if we speak TLS to a non tls port
+		// 	level.Error(logger).Log("msg", msg, "err", err)
+		// 	return
+		// }
 		statusCode = smtpErr.Code
-		statusCodeEnhanced := smtpErr.EnhancedCode[0]*100 + smtpErr.EnhancedCode[1]*10 + smtpErr.EnhancedCode[2]
+		statusCodeEnhanced = smtpErr.EnhancedCode[0]*100 + smtpErr.EnhancedCode[1]*10 + smtpErr.EnhancedCode[2]
 		level.Error(logger).Log("msg", msg, "err", err, "code", smtpErr.Code, "enhancedCode", statusCodeEnhanced)
 
 		validStatusCodesPretty := strings.Join(strings.Split(fmt.Sprint(module.SMTP.ValidStatusCodes), " "), ",")
@@ -128,82 +119,6 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 		}
 	}
 
-	newSMTPClient := func(targetIpPort string) (c *smtp.Client, err error) {
-
-		if strings.EqualFold(module.SMTP.TLS, "no") ||
-			strings.EqualFold(module.SMTP.TLS, "starttls") {
-
-			var d net.Dialer
-			// BUG: tcp or tcp6
-			conn, err := d.DialContext(ctx, "tcp", targetIpPort)
-			if err != nil {
-				return nil, fmt.Errorf("could not connect to target: %s", err)
-			}
-
-			deadline, _ := ctx.Deadline()
-			if err = conn.SetDeadline(deadline); err != nil {
-				return nil, err
-			}
-
-			c, err = smtp.NewClient(conn, "")
-			if err != nil {
-				return nil, err
-			}
-
-			c.DebugWriter = &result
-
-			if err = ehlo(c, module); err != nil {
-				return nil, err
-			}
-
-			if strings.EqualFold(module.SMTP.TLS, "starttls") {
-				tlsConfig, err := newTLSConfig(&module.SMTP.TLSConfig)
-				if err != nil {
-					return nil, err
-				}
-				if err = c.StartTLS(tlsConfig); err != nil {
-					return nil, err
-				}
-			}
-		}
-
-		if strings.EqualFold(module.SMTP.TLS, "tls") {
-
-			tlsConfig, err := newTLSConfig(&module.SMTP.TLSConfig)
-			if err != nil {
-				return nil, err
-			}
-
-			var d tls.Dialer
-			d.Config = tlsConfig
-			conn, err := d.DialContext(ctx, "tcp", targetIpPort)
-			if err != nil {
-				return nil, fmt.Errorf("could not connect to target: %s", err)
-			}
-
-			deadline, _ := ctx.Deadline()
-			if err = conn.SetDeadline(deadline); err != nil {
-				return nil, err
-			}
-
-			c, err = smtp.NewClient(conn, "")
-			if err != nil {
-				return nil, err
-			}
-
-			c.DebugWriter = &result
-			if err = ehlo(c, module); err != nil {
-				return nil, err
-			}
-		}
-
-		if c == nil {
-			return nil, errors.New("could not create SMTP client")
-		}
-		level.Info(logger).Log("msg", "Successfully connected to SMTP server", "server", targetIpPort, "tls", module.SMTP.TLS)
-		return c, nil
-	}
-
 	// target is the value of the GET parameter sent by Prometheus
 	targetHost, targetPort, err := net.SplitHostPort(target)
 	if err != nil {
@@ -211,8 +126,8 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 		return result
 	}
 
-	ip, lookupTime, err := chooseProtocol(ctx, module.SMTP.IPProtocol, module.SMTP.IPProtocolFallback, targetHost, registry, logger)
-	fmt.Println(lookupTime)
+	ip, _, err := chooseProtocol(ctx, module.SMTP.IPProtocol, module.SMTP.IPProtocolFallback, targetHost, registry, logger)
+	// ip, lookupTime, err := chooseProtocol(ctx, module.SMTP.IPProtocol, module.SMTP.IPProtocolFallback, targetHost, registry, logger)
 	if err != nil {
 		level.Error(logger).Log("msg", "Error resolving address", "err", err)
 		return result
@@ -222,20 +137,31 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 		module.SMTP.TLSConfig.ServerName = targetHost
 	}
 
-	c, err := newSMTPClient(net.JoinHostPort(ip.String(), targetPort))
+	c, err := newSMTPClient(ctx, module, logger, ip, targetPort)
 	if err != nil {
-		handleSmtpError(c, err, "Error creating SMTP client")
+		level.Error(logger).Log("msg", "Error creating SMTP client", "err", err)
 		return result
 	}
 
 	defer func() {
 		probeSmtpStatusCode.Set(float64(statusCode))
 		probeSmtpEnhancedStatusCode.Set(float64(statusCodeEnhanced))
-		// fmt.Println(result.Commands.String())
+
+		if err = c.Quit(); err != nil {
+			handleSMTPError(c, err, "Error sending QUIT command")
+		}
+		// if c != nil {
+		// 	fmt.Println("CLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLOSING the SMTP client with defer")
+		// 	if err := c.Close(); err != nil {
+		// 		level.Error(logger).Log("msg", "Error closing the connection", "err", err)
+		// 	}
+		// } else {
+		// 	fmt.Println("NOOOOOOOOOOOOOOOOOOOOOOT CLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLOSING the SMTP client with defer (seems like it's already closed)")
+		// }
 	}()
 
-	state, ok := c.TLSConnectionState()
-	if ok {
+	if module.SMTP.TLS != "no" {
+		state, _ := c.TLSConnectionState()
 		registry.MustRegister(probeTLSVersion, probeTLSInformation)
 		probeIsTLSGauge.Set(1)
 		probeTLSVersion.WithLabelValues(getTLSVersion(&state)).Set(1)
@@ -247,7 +173,7 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 	if len(module.SMTP.Auth.Username) > 0 {
 		auth := sasl.NewPlainClient("", module.SMTP.Auth.Username, string(module.SMTP.Auth.Password))
 		if err = c.Auth(auth); err != nil {
-			handleSmtpError(c, err, "Error sending AUTH command")
+			handleSMTPError(c, err, "Error sending AUTH command")
 			return result
 		}
 		level.Info(logger).Log("msg", "SMTP authentication was successful")
@@ -261,7 +187,7 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 	}
 
 	if err = c.Mail(module.SMTP.MailFrom, nil); err != nil {
-		handleSmtpError(c, err, "Error sending MAIL FROM command", "from", module.SMTP.MailFrom)
+		handleSMTPError(c, err, "Error sending MAIL FROM command", "from", module.SMTP.MailFrom)
 		return result
 	}
 	level.Info(logger).Log("msg", "MAIL FROM command sent successfully", "from", module.SMTP.MailFrom)
@@ -272,14 +198,14 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 	}
 
 	if err = c.Rcpt(module.SMTP.MailTo); err != nil {
-		handleSmtpError(c, err, "Error sending RCPT TO command", "rcpt", module.SMTP.MailTo)
+		handleSMTPError(c, err, "Error sending RCPT TO command", "rcpt", module.SMTP.MailTo)
 		return result
 	}
 	level.Info(logger).Log("msg", "RCPT TO command sent successfully", "rcpt", module.SMTP.MailTo)
 
 	w, err := c.Data()
 	if err != nil {
-		handleSmtpError(c, err, "Error sending DATA command")
+		handleSMTPError(c, err, "Error sending DATA command")
 		return result
 	}
 
@@ -292,11 +218,6 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 
 	if err = w.Close(); err != nil {
 		level.Error(logger).Log("msg", "Error closing message buffer", "err", err)
-	}
-
-	if err = c.Quit(); err != nil {
-		handleSmtpError(c, err, "Error sending QUIT command")
-		return result
 	}
 
 	level.Info(logger).Log("msg", "Message successfully sent", "subject", result.Subject)
@@ -339,9 +260,9 @@ func buildMessage(module config.Module) (string, string) {
 		headers["Subject"] = "[smtp_exporter]"
 	}
 
-	headers["Subject"] = fmt.Sprintf("%s %s", headers["Subject"], uuid.New().String())
 	headers["Message-ID"] = generateMessageID()
 	headers["Date"] = time.Now().Format("Mon, _2 Jan 2006 15:04:05 -0700")
+	headers["Subject"] = fmt.Sprintf("%s %s", headers["Subject"], uuid.New().String())
 
 	message := ""
 	for k, v := range headers {
@@ -349,4 +270,89 @@ func buildMessage(module config.Module) (string, string) {
 	}
 	message += "\r\n" + body
 	return message, headers["Subject"]
+}
+
+func newSMTPClient(ctx context.Context, module config.Module, logger log.Logger, ip *net.IPAddr, port string) (c *smtp.Client, err error) {
+
+	var dialProtocol, dialTarget string
+	if ip.IP.To4() == nil {
+		dialProtocol = "tcp6"
+	} else {
+		dialProtocol = "tcp4"
+	}
+
+	dialTarget = net.JoinHostPort(ip.String(), port)
+
+	if strings.EqualFold(module.SMTP.TLS, "no") ||
+		strings.EqualFold(module.SMTP.TLS, "starttls") {
+
+		var d net.Dialer
+		conn, err := d.DialContext(ctx, dialProtocol, dialTarget)
+		if err != nil {
+			return nil, err
+		}
+
+		deadline, _ := ctx.Deadline()
+		if err = conn.SetDeadline(deadline); err != nil {
+			return nil, err
+		}
+
+		c, err = smtp.NewClient(conn, "")
+		if err != nil {
+			return nil, err
+		}
+
+		// TODO: result as a parameter?
+		// c.DebugWriter = &result
+
+		if err = ehlo(c, module); err != nil {
+			return nil, err
+		}
+
+		if strings.EqualFold(module.SMTP.TLS, "starttls") {
+			tlsConfig, err := newTLSConfig(&module.SMTP.TLSConfig)
+			if err != nil {
+				return nil, err
+			}
+			if err = c.StartTLS(tlsConfig); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if strings.EqualFold(module.SMTP.TLS, "tls") {
+
+		tlsConfig, err := newTLSConfig(&module.SMTP.TLSConfig)
+		if err != nil {
+			return nil, err
+		}
+
+		var d tls.Dialer
+		d.Config = tlsConfig
+		conn, err := d.DialContext(ctx, dialProtocol, dialTarget)
+		if err != nil {
+			return nil, fmt.Errorf("could not connect to target: %s", err)
+		}
+
+		deadline, _ := ctx.Deadline()
+		if err = conn.SetDeadline(deadline); err != nil {
+			return nil, err
+		}
+
+		c, err = smtp.NewClient(conn, "")
+		if err != nil {
+			return nil, err
+		}
+
+		// c.DebugWriter = &result
+		if err = ehlo(c, module); err != nil {
+			return nil, err
+		}
+	}
+
+	if c == nil {
+		return nil, errors.New("could not create SMTP client")
+	}
+	level.Info(logger).Log("msg", "Successfully connected to SMTP server", "server", dialTarget, "tls", module.SMTP.TLS)
+	return c, nil
 }

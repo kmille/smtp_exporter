@@ -2,6 +2,7 @@ package prober
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -74,15 +75,39 @@ func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceive
 	// 	Commands: &bytes.Buffer{},
 	// 	Success:  false}
 
-	newImapClient := func() (c *client.Client, err error) {
+	newIMAPClient := func() (c *client.Client, err error) {
 
 		targetIpPort := net.JoinHostPort(module.Server, fmt.Sprintf("%d", module.Port))
 		level.Info(logger).Log("msg", "Connecting to IMAP server", "server", targetIpPort, "tls", module.TLS)
 
+		ip, _, err := net.SplitHostPort(targetIpPort)
+		if err != nil {
+			return nil, err
+		}
+		var dialProtocol string
+		if net.ParseIP(ip).To4() == nil {
+			dialProtocol = "tcp6"
+		} else {
+			dialProtocol = "tcp4"
+		}
+
 		if strings.EqualFold(module.TLS, "no") ||
 			strings.EqualFold(module.TLS, "starttls") {
 
-			c, err = client.Dial(targetIpPort)
+			var d net.Dialer
+
+			// BUG: tcp or tcp6, see: TCPProbe in blackbox_exporter
+			conn, err := d.DialContext(ctx, dialProtocol, targetIpPort)
+			if err != nil {
+				return nil, err
+			}
+
+			deadline, _ := ctx.Deadline()
+			if err = conn.SetDeadline(deadline); err != nil {
+				return nil, err
+			}
+
+			c, err = client.New(conn)
 			if err != nil {
 				return nil, err
 			}
@@ -106,7 +131,19 @@ func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceive
 				return nil, err
 			}
 
-			c, err = client.DialTLS(targetIpPort, tlsConfig)
+			var d tls.Dialer
+			d.Config = tlsConfig
+			conn, err := d.DialContext(ctx, dialProtocol, targetIpPort)
+			if err != nil {
+				return nil, err
+			}
+
+			deadline, _ := ctx.Deadline()
+			if err = conn.SetDeadline(deadline); err != nil {
+				return nil, err
+			}
+
+			c, err = client.New(conn)
 			if err != nil {
 				return nil, err
 			}
@@ -121,9 +158,9 @@ func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceive
 		return c, nil
 	}
 
-	c, err := newImapClient()
+	c, err := newIMAPClient()
 	if err != nil {
-		level.Error(logger).Log("msg", "Error connecting to IMAP server", "err", err)
+		level.Error(logger).Log("msg", "Error creating IMAP client", "err", err)
 		return
 	}
 
@@ -152,6 +189,7 @@ func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceive
 			return
 		}
 
+		// this loop does not honor the Timeout
 		if len(seq) == 0 {
 			level.Debug(logger).Log("msg", "Message not yet found. Next retry in a second", "mailbox", module.Mailbox, "subject", subject)
 			time.Sleep(1 * time.Second)
