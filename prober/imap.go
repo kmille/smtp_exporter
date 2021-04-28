@@ -43,27 +43,6 @@ var (
 	})
 )
 
-// type ImapProberResult struct {
-// 	// Commands contains all imap commands sent/received by the mail server
-// 	Commands *bytes.Buffer
-// 	Success  bool
-// }
-
-// func (i *ImapProberResult) Write(p []byte) (int, error) {
-// 	// TODO: map this to imap
-// 	if strings.HasPrefix(string(p), "AUTH PLAIN") {
-// 		i.Commands.Write([]byte("AUTH PLAIN <secret>\r\n"))
-// 	} else {
-// 		i.Commands.Write(p)
-// 	}
-// 	return len(p), nil
-
-// }
-
-// func (i *ImapProberResult) String() string {
-// 	return i.Commands.String()
-// }
-
 func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceiver, registry *prometheus.Registry, logger log.Logger) (success bool) {
 
 	registry.MustRegister(probeMessageReceived)
@@ -71,94 +50,7 @@ func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceive
 	registry.MustRegister(probeDKIMSuccess)
 	registry.MustRegister(probeDMARCSuccess)
 
-	// result := ImapProberResult{
-	// 	Commands: &bytes.Buffer{},
-	// 	Success:  false}
-
-	newIMAPClient := func() (c *client.Client, err error) {
-
-		targetIpPort := net.JoinHostPort(module.Server, fmt.Sprintf("%d", module.Port))
-		level.Info(logger).Log("msg", "Connecting to IMAP server", "server", targetIpPort, "tls", module.TLS)
-
-		ip, _, err := net.SplitHostPort(targetIpPort)
-		if err != nil {
-			return nil, err
-		}
-		var dialProtocol string
-		if net.ParseIP(ip).To4() == nil {
-			dialProtocol = "tcp6"
-		} else {
-			dialProtocol = "tcp4"
-		}
-
-		if strings.EqualFold(module.TLS, "no") ||
-			strings.EqualFold(module.TLS, "starttls") {
-
-			var d net.Dialer
-
-			// BUG: tcp or tcp6, see: TCPProbe in blackbox_exporter
-			conn, err := d.DialContext(ctx, dialProtocol, targetIpPort)
-			if err != nil {
-				return nil, err
-			}
-
-			deadline, _ := ctx.Deadline()
-			if err = conn.SetDeadline(deadline); err != nil {
-				return nil, err
-			}
-
-			c, err = client.New(conn)
-			if err != nil {
-				return nil, err
-			}
-			// c.SetDebug(result.Commands)
-
-			if strings.EqualFold(module.TLS, "starttls") {
-				tlsConfig, err := newTLSConfig(&module.TLSConfig)
-				if err != nil {
-					return nil, err
-				}
-
-				if err = c.StartTLS(tlsConfig); err != nil {
-					return nil, err
-				}
-			}
-		}
-
-		if strings.EqualFold(module.TLS, "tls") {
-			tlsConfig, err := newTLSConfig(&module.TLSConfig)
-			if err != nil {
-				return nil, err
-			}
-
-			var d tls.Dialer
-			d.Config = tlsConfig
-			conn, err := d.DialContext(ctx, dialProtocol, targetIpPort)
-			if err != nil {
-				return nil, err
-			}
-
-			deadline, _ := ctx.Deadline()
-			if err = conn.SetDeadline(deadline); err != nil {
-				return nil, err
-			}
-
-			c, err = client.New(conn)
-			if err != nil {
-				return nil, err
-			}
-			// c.SetDebug(result.Commands)
-			// c.SetDebug(os.Stdout)
-		}
-
-		if c == nil {
-			return nil, errors.New("could not create IMAP client")
-		}
-		level.Info(logger).Log("msg", "Successfully connected to IMAP server")
-		return c, nil
-	}
-
-	c, err := newIMAPClient()
+	c, err := newIMAPClient(ctx, module, logger)
 	if err != nil {
 		level.Error(logger).Log("msg", "Error creating IMAP client", "err", err)
 		return
@@ -183,20 +75,15 @@ func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceive
 	searchCriteria.Header = filterHeaders
 
 	var seq []uint32
-	for {
+	level.Info(logger).Log("msg", "Looking for previously sent message", "mailbox", module.Mailbox, "subject", subject)
+
+	// this loop does not honor the Timeout
+	for len(seq) == 0 {
 		if seq, err = c.Search(searchCriteria); err != nil {
 			level.Error(logger).Log("msg", "Error searching for messages", "err", err)
 			return
 		}
-
-		// this loop does not honor the Timeout
-		if len(seq) == 0 {
-			level.Debug(logger).Log("msg", "Message not yet found. Next retry in a second", "mailbox", module.Mailbox, "subject", subject)
-			time.Sleep(1 * time.Second)
-		} else {
-			break
-		}
-
+		time.Sleep(1 * time.Second)
 	}
 
 	seqset := new(imap.SeqSet)
@@ -218,7 +105,7 @@ func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceive
 		return
 	}
 
-	// BUG: wenn es zwei mails zu lesen gibt blocken wir hier, weil wir nur eine lesen!
+	// BUG: if there are two mails, we block here
 	if err := <-done; err != nil {
 		level.Error(logger).Log("msg", "Error fetching message", "err", err)
 		return
@@ -249,14 +136,20 @@ func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceive
 		return
 	}
 
-	identifier, authenticationResults, err := authres.Parse(m.Header.Get("Authentication-Results"))
-	fmt.Println(identifier)
+	_, authenticationResults, err := authres.Parse(m.Header.Get("Authentication-Results"))
 	if err != nil {
 		level.Error(logger).Log("msg", "Could not parse Authentication-Results header", "err", err)
 		return
 	}
 
-	spfOK, dkimOK, dmarcOK := false, false, false
+	return checkMail(module, logger, authenticationResults)
+}
+
+func checkMail(module config.IMAPReceiver, logger log.Logger, authenticationResults []authres.Result) bool {
+
+	spfOK := false
+	dkimOK := false
+	dmarcOK := false
 
 	for _, result := range authenticationResults {
 		switch result.(type) {
@@ -286,16 +179,93 @@ func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceive
 
 	if module.FailIfSPFNotMatches && !spfOK {
 		level.Error(logger).Log("msg", "Probe failed. SPF result does not match", "spfOK", spfOK, "fail_if_spf_not_matches", module.FailIfSPFNotMatches)
-		success = false
+		return false
 	} else if module.FailIfDKIMNotMatches && !dkimOK {
 		level.Error(logger).Log("msg", "Probe failed. DKIM result does not match", "dkimOK", dkimOK, "fail_if_dkim_not_matches", module.FailIfDKIMNotMatches)
-		success = false
+		return false
 	} else if module.FailIfDMARCNotMatches && !dmarcOK {
 		level.Error(logger).Log("msg", "Probe failed. DMARC result does not match", "dmarcOK", dmarcOK, "fail_if_dmarc_not_matches", module.FailIfDMARCNotMatches)
-		success = false
-	} else {
-		success = true
+		return false
 	}
 
-	return
+	return true
+}
+
+func newIMAPClient(ctx context.Context, module config.IMAPReceiver, logger log.Logger) (c *client.Client, err error) {
+
+	targetIpPort := net.JoinHostPort(module.Server, fmt.Sprintf("%d", module.Port))
+	level.Info(logger).Log("msg", "Connecting to IMAP server", "server", targetIpPort, "tls", module.TLS)
+
+	ip, _, err := net.SplitHostPort(targetIpPort)
+	if err != nil {
+		return nil, err
+	}
+	var dialProtocol string
+	if net.ParseIP(ip).To4() == nil {
+		dialProtocol = "tcp6"
+	} else {
+		dialProtocol = "tcp4"
+	}
+
+	if strings.EqualFold(module.TLS, "no") ||
+		strings.EqualFold(module.TLS, "starttls") {
+
+		var d net.Dialer
+
+		conn, err := d.DialContext(ctx, dialProtocol, targetIpPort)
+		if err != nil {
+			return nil, err
+		}
+
+		deadline, _ := ctx.Deadline()
+		if err = conn.SetDeadline(deadline); err != nil {
+			return nil, err
+		}
+
+		c, err = client.New(conn)
+		if err != nil {
+			return nil, err
+		}
+
+		if strings.EqualFold(module.TLS, "starttls") {
+			tlsConfig, err := newTLSConfig(&module.TLSConfig)
+			if err != nil {
+				return nil, err
+			}
+
+			if err = c.StartTLS(tlsConfig); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if strings.EqualFold(module.TLS, "tls") {
+		tlsConfig, err := newTLSConfig(&module.TLSConfig)
+		if err != nil {
+			return nil, err
+		}
+
+		var d tls.Dialer
+		d.Config = tlsConfig
+		conn, err := d.DialContext(ctx, dialProtocol, targetIpPort)
+		if err != nil {
+			return nil, err
+		}
+
+		deadline, _ := ctx.Deadline()
+		if err = conn.SetDeadline(deadline); err != nil {
+			return nil, err
+		}
+
+		c, err = client.New(conn)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if c == nil {
+		return nil, errors.New("could not create IMAP client")
+	}
+	level.Info(logger).Log("msg", "Successfully connected to IMAP server")
+	return c, nil
 }
