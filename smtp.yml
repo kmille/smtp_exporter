@@ -112,3 +112,13 @@ modules:
            password: password
         valid_spf_result: blubb
         fail_if_spf_not_matches: true
+
+
+  spf_test:
+    prober: spf
+    spf:
+      valid_spf_result: pass
+      domains:
+        #- golem.de # lookup limit reached
+        #- heise.de
+        - androidloves.me

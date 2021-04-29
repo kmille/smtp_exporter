@@ -44,10 +44,8 @@ func chooseProtocol(ctx context.Context, IPProtocol string, fallbackIPProtocol b
 	registry.MustRegister(probeIPAddrHash)
 
 	if IPProtocol == "ip6" {
-		IPProtocol = "ip6"
 		fallbackProtocol = "ip4"
 	} else {
-		IPProtocol = "ip4"
 		fallbackProtocol = "ip6"
 	}
 
@@ -68,7 +66,7 @@ func chooseProtocol(ctx context.Context, IPProtocol string, fallbackIPProtocol b
 
 	resolver := &net.Resolver{}
 
-	level.Info(logger).Log("msg", "Resolving target addreses", "targetHost", target, "ip_protocol", IPProtocol)
+	level.Info(logger).Log("msg", "Resolving target addresses", "targetHost", target, "ip_protocol", IPProtocol)
 	if ips, err := resolver.LookupIP(ctx, IPProtocol, target); err == nil {
 		level.Info(logger).Log("msg", "Resolved target address", "ip", ips[0].String())
 		usedProtocol = IPProtocol

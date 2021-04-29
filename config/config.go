@@ -26,7 +26,7 @@ var (
 		Help:      "Timestamp of the last successful configuration reload.",
 	})
 
-	DefaultSmtpProbe = SMTPProbe{
+	DefaultSMTPProbe = SMTPProbe{
 		IPProtocol:         "ip6",
 		IPProtocolFallback: true,
 		EHLO:               "localhost",
@@ -67,6 +67,7 @@ type Module struct {
 	Prober  string        `yaml:"prober"`
 	Timeout time.Duration `yaml:"timeout,omitempty"`
 	SMTP    SMTPProbe     `yaml:"smtp,omitempty"`
+	SPF     SPFProbe      `yaml:"spf,omitempty"`
 }
 
 type IMAPReceiver struct {
@@ -100,9 +101,14 @@ type SMTPProbe struct {
 	IMAP               IMAPReceiver      `yaml:"imap,omitempty"`
 }
 
+type SPFProbe struct {
+	Domains        []string `yaml:"domains,omitempty"`
+	ValidSPFResult string   `yaml:"valid_spf_result,omitempty"`
+}
+
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (s *SMTPProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	*s = DefaultSmtpProbe
+	*s = DefaultSMTPProbe
 	type plain SMTPProbe
 	if err := unmarshal((*plain)(s)); err != nil {
 		return err
@@ -132,7 +138,6 @@ func (s *SMTPProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (i *IMAPReceiver) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
-	//FailIfSPFNotMatches, FailIfDKIMNotMatches and FailIfDMARCNotMatches defaults to false
 	*i = DefaultIMAPReceiver
 	type plain IMAPReceiver
 	if err := unmarshal((*plain)(i)); err != nil {
@@ -156,6 +161,24 @@ func (i *IMAPReceiver) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		i.TLSConfig.ServerName = i.Server
 	}
 
+	return nil
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (s *SPFProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
+
+	*s = SPFProbe{}
+	type plain SPFProbe
+	if err := unmarshal((*plain)(s)); err != nil {
+		return err
+	}
+
+	// for _, domain := range s.Domains {
+	// 	_, ok := dns.IsDomainName(domain)
+	// 	if !ok {
+	// 		return fmt.Errorf("domain name '%s' is not a valid domain", domain)
+	// 	}
+	// }
 	return nil
 }
 

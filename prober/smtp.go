@@ -21,28 +21,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type SmtpProberResult struct {
-	// Commands contains all smtp commands sent/received by the mail server
-	Commands *bytes.Buffer
-	Success  bool
-	Subject  string
-}
-
-func (s *SmtpProberResult) Write(p []byte) (int, error) {
-	if strings.HasPrefix(string(p), "AUTH PLAIN") {
-		s.Commands.Write([]byte("AUTH PLAIN <secret>\r\n"))
-	} else {
-		s.Commands.Write(p)
-	}
-	return len(p), nil
-
-}
-
-func (s *SmtpProberResult) String() string {
-	return s.Commands.String()
-}
-
-func SmtpProber(ctx context.Context, target string, module config.Module, registry *prometheus.Registry, logger log.Logger) SmtpProberResult {
+func SMTPProber(ctx context.Context, target string, module config.Module, registry *prometheus.Registry, logger log.Logger) ProbeResult {
 
 	var (
 		statusCode         = -1
@@ -88,7 +67,7 @@ func SmtpProber(ctx context.Context, target string, module config.Module, regist
 		})
 	)
 
-	result := SmtpProberResult{
+	result := ProbeResult{
 		Commands: &bytes.Buffer{},
 		Success:  false}
 
