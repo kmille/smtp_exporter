@@ -122,3 +122,6 @@ modules:
         #- golem.de # lookup limit reached
         #- heise.de
         - androidloves.me
+  
+  dnsbl_test:
+    prober: dnsbl
