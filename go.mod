@@ -3,7 +3,7 @@ module github.com/kmille/smtp_exporter
 go 1.16
 
 require (
-	blitiri.com.ar/go/spf v1.1.1 // indirect
+	blitiri.com.ar/go/spf v1.1.1
 	github.com/alecthomas/units v0.0.0-20210208195552-ff826a37aa15 // indirect
 	github.com/emersion/go-imap v1.0.6
 	github.com/emersion/go-msgauth v0.6.5

@@ -1,11 +1,21 @@
 TODOs
-- find a better error message (where does this come from?):
-ts=2021-04-27T14:01:01.237Z caller=main.go:170 module=smtp_starttls_authentication_ok target=localhost:25 level=debug msg="unsupported value type" err="read tcp 127.0.0.1:39450->127.0.0.1:25: i/o timeout"
-
+- The DNSBLProber code is still not perfect (we write in the results channel after ctx.Done)
+- BUG: Default blacklist in DNSBLProble are not loaded, because there are no other fields than the blacklists.
+    - the UnmarshalYAML function will not be called ...
 - logging: check caller=main.go:123 output
+- BUG: the order of the tags changes
+level=debug ts=2021-04-30T06:42:20.235Z caller=main.go:264 routePrefix=/
+level=info ts=2021-04-30T06:42:20.235Z caller=main.go:402 msg="Listen on address" address=:9125
+level=info ts=2021-04-30T06:42:20.235Z caller=tls_config.go:191 msg="TLS is disabled." http2=false
+ts=2021-04-30T06:42:20.736Z caller=main.go:172 module=dnsbl_test target=62.180.228.192 level=debug msg="Beginning probe" probe=dnsbl timeout_seconds=2
+ts=2021-04-30T06:42:22.737Z caller=main.go:172 module=dnsbl_test target=62.180.228.192 level=debug msg="Error resolving host" err="lookup 192.228.180.62.zen.spamhaus.org on 127.0.0.53:53: dial udp 1.1.1.6:53: i/o timeout"
+ts=2021-04
+- use a consistent naming schema in error messages: validSPFResult vs fail_if_..
+- Bug: imap receiver: loop does not honor timeout
+- BUG: imap receiver: if we find two messages for our search we will block forever
 - implement the smtpd receiver
     - add additional checks(SPF, DNS records, blacklisted)
-- metrics for durations
+- metrics for smtp prober: durations
         - DNS is already working
     - interesting: how long does it take to receive the mail 
 - add more tests

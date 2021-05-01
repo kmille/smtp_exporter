@@ -51,7 +51,9 @@ var (
 	timeoutOffset = kingpin.Flag("timeout-offset", "Offset to subtract from timeout in seconds").Default("0").Float64()
 
 	Probers = map[string]prober.ProberFn{
-		"smtp": prober.SmtpProber,
+		"smtp":  prober.SMTPProber,
+		"spf":   prober.SPFProber,
+		"dnsbl": prober.DNSBLProber,
 	}
 
 	moduleUnknownCounter = prometheus.NewCounter(prometheus.CounterOpts{
@@ -76,7 +78,6 @@ func probeHandler(w http.ResponseWriter, r *http.Request, c *config.Config, logg
 		http.Error(w, fmt.Sprintf("Failed to parse timeout from Prometheus header: %s", err), http.StatusInternalServerError)
 		return
 	}
-
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(timeoutSeconds*float64(time.Second)))
 	defer cancel()
 	r = r.WithContext(ctx)
@@ -113,16 +114,6 @@ func probeHandler(w http.ResponseWriter, r *http.Request, c *config.Config, logg
 
 	smtpProberResult := prober(ctx, target, module, registry, sl)
 	success := smtpProberResult.Success
-	// if module.Prober == "imap" && success {
-	// 	imapProberResult := prober.ImapProber(ctx, smtpProberResult.Subject, module, registry, sl)
-	// 	success = imapProberResult.Success
-	// fmt.Fprintf(&sl.buffer, "\nIMAP commands:\n")
-	// fmt.Fprint(&sl.buffer, imapProberResult.Commands.String())
-
-	// }
-
-	// fmt.Fprintf(&sl.buffer, "\nSMTP commands:\n")
-	// fmt.Fprint(&sl.buffer, smtpProberResult.Commands.String())
 
 	duration := time.Since(start).Seconds()
 	probeDurationGauge.Set(duration)
@@ -132,6 +123,9 @@ func probeHandler(w http.ResponseWriter, r *http.Request, c *config.Config, logg
 	} else {
 		level.Info(sl).Log("msg", "Probe failed", "duration_seconds", duration)
 	}
+
+	fmt.Fprintf(&sl.buffer, "\nSMTP commands:\n")
+	fmt.Fprint(&sl.buffer, smtpProberResult.Commands.String())
 
 	debugOutput := DebugOutput(&module, &sl.buffer, registry)
 	rh.Add(moduleName, target, debugOutput, success)
@@ -210,8 +204,7 @@ func getTimeout(r *http.Request, module config.Module, offset float64) (timeoutS
 	}
 
 	if timeoutSeconds == 0 {
-		// timeoutSeconds = 120
-		timeoutSeconds = 5
+		timeoutSeconds = 120
 	}
 
 	var maxTimeOutSeconds = timeoutSeconds - offset
