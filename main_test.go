@@ -15,7 +15,7 @@ import (
 
 var c = &config.Config{
 	Modules: map[string]config.Module{
-		"smtp_auth": config.Module{
+		"smtp_test_module": config.Module{
 			Prober:  "smtp",
 			Timeout: 10 * time.Second,
 			SMTP: config.SMTPProbe{
@@ -29,8 +29,12 @@ var c = &config.Config{
 	},
 }
 
+/* TODO tests
+- module not found
+- no target supplied
+*/
 func TestPrometheusConfigSecretsHidden(t *testing.T) {
-	req, err := http.NewRequest("GET", "?debug=true&module=smtp_auth&target=smtp.gmail.com:465", nil)
+	req, err := http.NewRequest("GET", "?debug=true&module=smtp_test_module&target=smtp.gmail.com:465", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +56,7 @@ func TestPrometheusConfigSecretsHidden(t *testing.T) {
 }
 
 func TestDebugOutputSecretsHidden(t *testing.T) {
-	module := c.Modules["smtp_auth"]
+	module := c.Modules["smtp_test_module"]
 	out := DebugOutput(&module, &bytes.Buffer{}, prometheus.NewRegistry())
 
 	if strings.Contains(out, "mysecret") {

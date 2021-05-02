@@ -11,10 +11,10 @@ import (
 )
 
 type ProbeResult struct {
+	Success bool
 	// Commands contains all smtp commands sent/received by the mail server
+	// used only by the smtp prober
 	Commands *bytes.Buffer
-	Success  bool
-	Subject  string
 }
 
 func (s *ProbeResult) Write(p []byte) (int, error) {

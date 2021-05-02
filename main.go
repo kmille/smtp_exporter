@@ -98,7 +98,7 @@ func probeHandler(w http.ResponseWriter, r *http.Request, c *config.Config, logg
 		return
 	}
 
-	prober, ok := Probers[module.Prober]
+	proberFunc, ok := Probers[module.Prober]
 	if !ok {
 		http.Error(w, fmt.Sprintf("Unknown prober %q", module.Prober), http.StatusBadRequest)
 		return
@@ -112,8 +112,9 @@ func probeHandler(w http.ResponseWriter, r *http.Request, c *config.Config, logg
 	registry.MustRegister(probeSuccessGauge)
 	registry.MustRegister(probeDurationGauge)
 
-	smtpProberResult := prober(ctx, target, module, registry, sl)
-	success := smtpProberResult.Success
+	probeResult := proberFunc(ctx, target, module, registry, sl)
+
+	success := probeResult.Success
 
 	duration := time.Since(start).Seconds()
 	probeDurationGauge.Set(duration)
@@ -125,7 +126,7 @@ func probeHandler(w http.ResponseWriter, r *http.Request, c *config.Config, logg
 	}
 
 	fmt.Fprintf(&sl.buffer, "\nSMTP commands:\n")
-	fmt.Fprint(&sl.buffer, smtpProberResult.Commands.String())
+	fmt.Fprint(&sl.buffer, probeResult.Commands.String())
 
 	debugOutput := DebugOutput(&module, &sl.buffer, registry)
 	rh.Add(moduleName, target, debugOutput, success)

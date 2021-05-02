@@ -69,7 +69,8 @@ func SMTPProber(ctx context.Context, target string, module config.Module, regist
 
 	result := ProbeResult{
 		Commands: &bytes.Buffer{},
-		Success:  false}
+		Success:  false,
+	}
 
 	registry.MustRegister(probeMessageSent)
 	registry.MustRegister(probeIsTLSGauge)
@@ -189,7 +190,6 @@ func SMTPProber(ctx context.Context, target string, module config.Module, regist
 	}
 
 	message, subject := buildMessage(module)
-	result.Subject = subject
 
 	if _, err = w.Write([]byte(message)); err != nil {
 		level.Error(logger).Log("msg", "Error writing message buffer", "err", err)
@@ -199,7 +199,7 @@ func SMTPProber(ctx context.Context, target string, module config.Module, regist
 		level.Error(logger).Log("msg", "Error closing message buffer", "err", err)
 	}
 
-	level.Info(logger).Log("msg", "Message successfully sent", "subject", result.Subject)
+	level.Info(logger).Log("msg", "Message successfully sent", "subject", subject)
 	probeMessageSent.Set(1)
 	// go-smtp doesn't give us access to the statusCode/statusCodeEnhanced if transmission succeeds
 	statusCode = 221
@@ -208,7 +208,7 @@ func SMTPProber(ctx context.Context, target string, module config.Module, regist
 	if len(module.SMTP.Receiver) == 0 {
 		result.Success = true
 	} else if module.SMTP.Receiver == "imap" {
-		success := IMAPReceiver(ctx, result.Subject, module.SMTP.IMAP, registry, logger)
+		success := IMAPReceiver(ctx, subject, module.SMTP.IMAP, registry, logger)
 		result.Success = success
 	}
 	return result

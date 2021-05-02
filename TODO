@@ -1,4 +1,5 @@
 TODOs
+- hardened systemd unit file
 - The DNSBLProber code is still not perfect (we write in the results channel after ctx.Done)
 - BUG: Default blacklist in DNSBLProble are not loaded, because there are no other fields than the blacklists.
     - the UnmarshalYAML function will not be called ...

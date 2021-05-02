@@ -1,7 +1,6 @@
 package prober
 
 import (
-	"bytes"
 	"context"
 	"net"
 
@@ -26,9 +25,7 @@ func doSPFCheck(c chan spfResult, ip net.IP, domain string) {
 
 func SPFProber(ctx context.Context, target string, module config.Module, registry *prometheus.Registry, logger log.Logger) ProbeResult {
 
-	result := ProbeResult{
-		Commands: &bytes.Buffer{},
-		Success:  false}
+	result := ProbeResult{Success: false}
 
 	// // should work
 	// ip := net.ParseIP("138.201.174.101")
