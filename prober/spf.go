@@ -13,6 +13,8 @@ import (
 
 type spfResult struct {
 	result spf.Result
+	// the returned error of the blitiri.com/spf module is not a regular go like error
+	// see https://groups.google.com/g/chasquid/c/K183fDvuPJg
 	reason error
 }
 
@@ -26,16 +28,6 @@ func doSPFCheck(c chan spfResult, ip net.IP, domain string) {
 func SPFProber(ctx context.Context, target string, module config.Module, registry *prometheus.Registry, logger log.Logger) ProbeResult {
 
 	result := ProbeResult{Success: false}
-
-	// // should work
-	// ip := net.ParseIP("138.201.174.101")
-	// r, err := spf.CheckHost(ip, "androidloves.me")
-	// fmt.Println("result", r, "err", err)
-
-	// // should not work
-	// ip = net.ParseIP("62.180.228.1")
-	// r, err = spf.CheckHost(ip, "androidloves.me")
-	// fmt.Println("result", r, "err", err)
 
 	_, _, err := net.SplitHostPort(target)
 	if err == nil {
