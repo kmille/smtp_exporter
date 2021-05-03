@@ -29,6 +29,7 @@ var (
 	DefaultModule = Module{
 		SMTP:  DefaultSMTPProbe,
 		DNSBL: DefaultDNSBLProbe,
+		SPF:   DefaultSPFProbe,
 	}
 
 	DefaultSMTPProbe = SMTPProbe{
@@ -56,6 +57,10 @@ var (
 			"b.barracudacentral.org",
 			"ix.dnsbl.manitu.net",
 		},
+	}
+
+	DefaultSPFProbe = SPFProbe{
+		ValidSPFResult: "pass",
 	}
 
 // Blacklists: []string{
@@ -198,9 +203,8 @@ type SMTPProbe struct {
 }
 
 type SPFProbe struct {
-	Domains []string `yaml:"domains,omitempty"`
-	// TODO: how is the default loaded if there is no DefaultSPFProbe?
-	ValidSPFResult string `yaml:"valid_spf_result,omitempty"`
+	Domains        []string `yaml:"domains,omitempty"`
+	ValidSPFResult string   `yaml:"valid_spf_result,omitempty"`
 }
 
 type DNSBLProbe struct {
