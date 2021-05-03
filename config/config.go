@@ -26,6 +26,11 @@ var (
 		Help:      "Timestamp of the last successful configuration reload.",
 	})
 
+	DefaultModule = Module{
+		SMTP:  DefaultSMTPProbe,
+		DNSBL: DefaultDNSBLProbe,
+	}
+
 	DefaultSMTPProbe = SMTPProbe{
 		IPProtocol:         "ip6",
 		IPProtocolFallback: true,
@@ -43,6 +48,96 @@ var (
 		FailIfDKIMNotMatches:  false,
 		FailIfDMARCNotMatches: false,
 	}
+
+	DefaultDNSBLProbe = DNSBLProbe{
+		FailOnBlacklistTimeout: true,
+		Blacklists: []string{
+			"zen.spamhaus.org",
+			"b.barracudacentral.org",
+			"ix.dnsbl.manitu.net",
+		},
+	}
+
+// Blacklists: []string{
+// 	"aspews.ext.sorbs.net",
+// 	"b.barracudacentral.org",
+// 	"bl.deadbeef.com",
+// 	"bl.emailbasura.org",
+// 	"bl.spamcannibal.org",
+// 	"bl.spamcop.net",
+// 	"blackholes.five-ten-sg.com",
+// 	"blacklist.woody.ch",
+// 	"bogons.cymru.com",
+// 	"cbl.abuseat.org",
+// 	"cdl.anti-spam.org.cn",
+// 	"combined.abuse.ch",
+// 	"combined.rbl.msrbl.net",
+// 	"db.wpbl.info",
+// 	"dnsbl-1.uceprotect.net",
+// 	"dnsbl-2.uceprotect.net",
+// 	"dnsbl-3.uceprotect.net",
+// 	"dnsbl.cyberlogic.net",
+// 	"dnsbl.dronebl.org",
+// 	"dnsbl.inps.de",
+// 	"dnsbl.njabl.org",
+// 	"dnsbl.sorbs.net",
+// 	"drone.abuse.ch",
+// 	"duinv.aupads.org",
+// 	"dul.dnsbl.sorbs.net",
+// 	"dul.ru",
+// 	"dyna.spamrats.com",
+// 	"dynip.rothen.com",
+// 	"http.dnsbl.sorbs.net",
+// 	"images.rbl.msrbl.net",
+// 	"ips.backscatterer.org",
+// 	"ix.dnsbl.manitu.net",
+// 	"korea.services.net",
+// 	"misc.dnsbl.sorbs.net",
+// 	"noptr.spamrats.com",
+// 	"ohps.dnsbl.net.au",
+// 	"omrs.dnsbl.net.au",
+// 	"orvedb.aupads.org",
+// 	"osps.dnsbl.net.au",
+// 	"osrs.dnsbl.net.au",
+// 	"owfs.dnsbl.net.au",
+// 	"owps.dnsbl.net.au",
+// 	"pbl.spamhaus.org",
+// 	"phishing.rbl.msrbl.net",
+// 	"probes.dnsbl.net.au",
+// 	"proxy.bl.gweep.ca",
+// 	"proxy.block.transip.nl",
+// 	"psbl.surriel.com",
+// 	"rdts.dnsbl.net.au",
+// 	"relays.bl.gweep.ca",
+// 	"relays.bl.kundenserver.de",
+// 	"relays.nether.net",
+// 	"residential.block.transip.nl",
+// 	"ricn.dnsbl.net.au",
+// 	"rmst.dnsbl.net.au",
+// 	"sbl.spamhaus.org",
+// 	"short.rbl.jp",
+// 	"smtp.dnsbl.sorbs.net",
+// 	"socks.dnsbl.sorbs.net",
+// 	"spam.abuse.ch",
+// 	"spam.dnsbl.sorbs.net",
+// 	"spam.rbl.msrbl.net",
+// 	"spam.spamrats.com",
+// 	"spamlist.or.kr",
+// 	"spamrbl.imp.ch",
+// 	"t3direct.dnsbl.net.au",
+// 	"tor.dnsbl.sectoor.de",
+// 	"torserver.tor.dnsbl.sectoor.de",
+// 	"ubl.lashback.com",
+// 	"ubl.unsubscore.com",
+// 	"virbl.bit.nl",
+// 	"virus.rbl.jp",
+// 	"virus.rbl.msrbl.net",
+// 	"web.dnsbl.sorbs.net",
+// 	"wormrbl.imp.ch",
+// 	"xbl.spamhaus.org",
+// 	"zen.spamhaus.org",
+// 	"zombie.dnsbl.sorbs.net",
+// }
 )
 
 func init() {
@@ -103,12 +198,43 @@ type SMTPProbe struct {
 }
 
 type SPFProbe struct {
-	Domains        []string `yaml:"domains,omitempty"`
-	ValidSPFResult string   `yaml:"valid_spf_result,omitempty"`
+	Domains []string `yaml:"domains,omitempty"`
+	// TODO: how is the default loaded if there is no DefaultSPFProbe?
+	ValidSPFResult string `yaml:"valid_spf_result,omitempty"`
 }
 
 type DNSBLProbe struct {
-	Blacklists []string `yaml:"blacklists,omitempty"`
+	Blacklists             []string `yaml:"blacklists,omitempty"`
+	FailOnBlacklistTimeout bool     `yaml:"fail_on_blacklist_timeout,omitempty"`
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (i *IMAPReceiver) UnmarshalYAML(unmarshal func(interface{}) error) error {
+
+	*i = DefaultIMAPReceiver
+	type plain IMAPReceiver
+	if err := unmarshal((*plain)(i)); err != nil {
+		return err
+	}
+
+	if len(i.Server) == 0 {
+		return fmt.Errorf("IMAP server must not be empty. server='%s'", i.Server)
+	}
+
+	if i.Port == 0 {
+		return fmt.Errorf("IMAP port must not be empty. port='%d'", i.Port)
+	}
+
+	r, _ := regexp.Compile(`^(no|starttls|tls)$`)
+	if !r.MatchString(i.TLS) {
+		return fmt.Errorf("tls value must be a an empty string (implicit no) or no|starttls|tls. prober=smtp tls=%s", i.TLS)
+	}
+
+	if len(i.TLSConfig.ServerName) == 0 {
+		i.TLSConfig.ServerName = i.Server
+	}
+
+	return nil
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -141,31 +267,24 @@ func (s *SMTPProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (i *IMAPReceiver) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (d *DNSBLProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
-	*i = DefaultIMAPReceiver
-	type plain IMAPReceiver
-	if err := unmarshal((*plain)(i)); err != nil {
+	*d = DefaultDNSBLProbe
+	type plain DNSBLProbe
+	if err := unmarshal((*plain)(d)); err != nil {
 		return err
 	}
 
-	if len(i.Server) == 0 {
-		return fmt.Errorf("IMAP server must not be empty. server='%s'", i.Server)
-	}
+	return nil
+}
 
-	if i.Port == 0 {
-		return fmt.Errorf("IMAP port must not be empty. port='%d'", i.Port)
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (s *Module) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*s = DefaultModule
+	type plain Module
+	if err := unmarshal((*plain)(s)); err != nil {
+		return err
 	}
-
-	r, _ := regexp.Compile(`^(no|starttls|tls)$`)
-	if !r.MatchString(i.TLS) {
-		return fmt.Errorf("tls value must be a an empty string (implicit no) or no|starttls|tls. prober=smtp tls=%s", i.TLS)
-	}
-
-	if len(i.TLSConfig.ServerName) == 0 {
-		i.TLSConfig.ServerName = i.Server
-	}
-
 	return nil
 }
 

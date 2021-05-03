@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -14,102 +15,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var defaultBlacklists = []string{
-	"zen.spamhaus.org",
-	"b.barracudacentral.org",
-	"bl.spamcop.net",
-	// "dnsbl.sorbs.net",
-	"five-ten-sg.com",
-	"db.wpbl.info",
-	"ix.dnsbl.manitu.net",
-}
-
-// var defaultBlacklists = []string{
-// 	"aspews.ext.sorbs.net",
-// 	"b.barracudacentral.org",
-// 	"bl.deadbeef.com",
-// 	"bl.emailbasura.org",
-// 	"bl.spamcannibal.org",
-// 	"bl.spamcop.net",
-// 	"blackholes.five-ten-sg.com",
-// 	"blacklist.woody.ch",
-// 	"bogons.cymru.com",
-// 	"cbl.abuseat.org",
-// 	"cdl.anti-spam.org.cn",
-// 	"combined.abuse.ch",
-// 	"combined.rbl.msrbl.net",
-// 	"db.wpbl.info",
-// 	"dnsbl-1.uceprotect.net",
-// 	"dnsbl-2.uceprotect.net",
-// 	"dnsbl-3.uceprotect.net",
-// 	"dnsbl.cyberlogic.net",
-// 	"dnsbl.dronebl.org",
-// 	"dnsbl.inps.de",
-// 	"dnsbl.njabl.org",
-// 	"dnsbl.sorbs.net",
-// 	"drone.abuse.ch",
-// 	"duinv.aupads.org",
-// 	"dul.dnsbl.sorbs.net",
-// 	"dul.ru",
-// 	"dyna.spamrats.com",
-// 	"dynip.rothen.com",
-// 	"http.dnsbl.sorbs.net",
-// 	"images.rbl.msrbl.net",
-// 	"ips.backscatterer.org",
-// 	"ix.dnsbl.manitu.net",
-// 	"korea.services.net",
-// 	"misc.dnsbl.sorbs.net",
-// 	"noptr.spamrats.com",
-// 	"ohps.dnsbl.net.au",
-// 	"omrs.dnsbl.net.au",
-// 	"orvedb.aupads.org",
-// 	"osps.dnsbl.net.au",
-// 	"osrs.dnsbl.net.au",
-// 	"owfs.dnsbl.net.au",
-// 	"owps.dnsbl.net.au",
-// 	"pbl.spamhaus.org",
-// 	"phishing.rbl.msrbl.net",
-// 	"probes.dnsbl.net.au",
-// 	"proxy.bl.gweep.ca",
-// 	"proxy.block.transip.nl",
-// 	"psbl.surriel.com",
-// 	"rdts.dnsbl.net.au",
-// 	"relays.bl.gweep.ca",
-// 	"relays.bl.kundenserver.de",
-// 	"relays.nether.net",
-// 	"residential.block.transip.nl",
-// 	"ricn.dnsbl.net.au",
-// 	"rmst.dnsbl.net.au",
-// 	"sbl.spamhaus.org",
-// 	"short.rbl.jp",
-// 	"smtp.dnsbl.sorbs.net",
-// 	"socks.dnsbl.sorbs.net",
-// 	"spam.abuse.ch",
-// 	"spam.dnsbl.sorbs.net",
-// 	"spam.rbl.msrbl.net",
-// 	"spam.spamrats.com",
-// 	"spamlist.or.kr",
-// 	"spamrbl.imp.ch",
-// 	"t3direct.dnsbl.net.au",
-// 	"tor.dnsbl.sectoor.de",
-// 	"torserver.tor.dnsbl.sectoor.de",
-// 	"ubl.lashback.com",
-// 	"ubl.unsubscore.com",
-// 	"virbl.bit.nl",
-// 	"virus.rbl.jp",
-// 	"virus.rbl.msrbl.net",
-// 	"web.dnsbl.sorbs.net",
-// 	"wormrbl.imp.ch",
-// 	"xbl.spamhaus.org",
-// 	"zen.spamhaus.org",
-// 	"zombie.dnsbl.sorbs.net",
-// }
-
 // DNSBL is specified in https://tools.ietf.org/html/rfc5782
 func DNSBLProber(ctx context.Context, target string, module config.Module, registry *prometheus.Registry, logger log.Logger) ProbeResult {
 
 	var blacklisted bool
-	var blacklists []string
 
 	result := ProbeResult{Success: false}
 
@@ -125,39 +34,19 @@ func DNSBLProber(ctx context.Context, target string, module config.Module, regis
 		return result
 	}
 
-	resolver := net.DefaultResolver
-	// for testing
-	// https://www.spamhaus.org/faq/section/DNSBL%20Usage#366
-	// resolver.PreferGo = true
-	// resolver.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
-	// 	d := net.Dialer{
-	// 		Timeout: time.Millisecond * time.Duration(10000),
-	// 	}
-	// 	// return d.DialContext(ctx, network, "1.1.1.6:53")
-	// 	return d.DialContext(ctx, network, "192.168.10.1:53")
-	// }
-
-	// TODO: try to resolve every host at startup?
-
-	if len(module.DNSBL.Blacklists) == 0 {
-		blacklists = defaultBlacklists
-	} else {
-		blacklists = module.DNSBL.Blacklists
-	}
-
-	numBlacklists := len(blacklists)
+	numBlacklists := len(module.DNSBL.Blacklists)
 	const paralellJobs = 5
 	jobs := make(chan string, numBlacklists)
 	results := make(chan bool, numBlacklists)
 
 	// start worker
 	for i := 0; i < paralellJobs; i++ {
-		go checkBlacklistWorker(ctx, logger, jobs, results, ip, resolver)
+		go checkBlacklist(ctx, logger, jobs, results, ip, module.DNSBL.FailOnBlacklistTimeout)
 	}
 
 	// give work to the worker
 	for i := 0; i < numBlacklists; i++ {
-		jobs <- blacklists[i]
+		jobs <- module.DNSBL.Blacklists[i]
 	}
 	// stop all worker if they are done processing all blacklists
 	close(jobs)
@@ -177,50 +66,65 @@ func DNSBLProber(ctx context.Context, target string, module config.Module, regis
 	return result
 }
 
-func checkBlacklistWorker(ctx context.Context, logger log.Logger, jobs <-chan string, results chan<- bool, ip net.IP, resolver *net.Resolver) {
+func checkBlacklist(ctx context.Context, logger log.Logger, jobs <-chan string, results chan<- bool, ip net.IP, timeoutResult bool) {
 	var reason string
+	resolver := &net.Resolver{}
+	// for testing
+	// https://www.spamhaus.org/faq/section/DNSBL%20Usage#366
+	// resolver.PreferGo = true
+	// resolver.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+	// 	d := net.Dialer{
+	// 		Timeout: time.Millisecond * time.Duration(10000),
+	// 	}
+	// 	return d.DialContext(ctx, network, "1.1.1.6:53")
+	// 	//return d.DialContext(ctx, network, "192.168.10.1:53")
+	// }
 
 	for {
-		select {
-		case <-ctx.Done():
-			// BUG? we are writing more than len(blacklists) into the results channel?
-			results <- true
-		case blacklist, isOpen := <-jobs:
 
-			if !isOpen {
-				return
-			}
-
-			host := fmt.Sprintf("%s.%s", rDNSFormat(ip), blacklist)
-			_, err := resolver.LookupHost(ctx, host)
-			// handle dns timeout
-			if networkErr, ok := err.(net.Error); ok && networkErr.Timeout() {
-				level.Error(logger).Log("msg", "Error resolving host", "blacklist", blacklist, "err", networkErr)
-				results <- true
-				break
-			}
-			// we are not on the blacklist - dns: "no such host"
-			if err != nil {
-				results <- false
-				break
-			}
-
-			txt, err := resolver.LookupTXT(ctx, host)
-			// handle dns timeout
-			if networkErr, ok := err.(net.Error); ok && networkErr.Timeout() {
-				level.Error(logger).Log("msg", "Error resolving blacklist reason (txt)", "blacklist", blacklist, "err", networkErr)
-				results <- true
-				break
-			}
-			if err == nil {
-				reason = txt[0]
-			} else {
-				// no reason found (not mandatory) - dns: "no such host"
-				reason = "unknown"
-			}
-			level.Error(logger).Log("msg", "Target found on a blacklist", "blacklist", blacklist, "reason", reason)
-			results <- true
+		blacklist, isOpen := <-jobs
+		if !isOpen {
+			return
 		}
+
+		if errors.Is(ctx.Err(), context.Canceled) {
+			level.Error(logger).Log("msg", "Execution timeout", "blacklist", blacklist, "err", ctx.Err())
+			results <- timeoutResult
+			continue
+		}
+
+		host := fmt.Sprintf("%s.%s", rDNSFormat(ip), blacklist)
+		_, err := resolver.LookupHost(ctx, host)
+
+		// handle dns timeout
+		if networkErr, ok := err.(net.Error); ok && networkErr.Timeout() {
+			level.Error(logger).Log("msg", "Error resolving host", "blacklist", blacklist, "err", networkErr)
+			results <- timeoutResult
+			continue
+		}
+
+		// not on the blacklist - dns: "no such host"
+		if err != nil {
+			results <- false
+			continue
+		}
+
+		txt, err := resolver.LookupTXT(ctx, host)
+		// handle dns timeout
+		if networkErr, ok := err.(net.Error); ok && networkErr.Timeout() {
+			level.Error(logger).Log("msg", "Error resolving TXT record (blacklist reason)", "blacklist", blacklist, "err", networkErr)
+			results <- timeoutResult
+			continue
+		}
+		if err == nil {
+			reason = txt[0]
+		} else {
+			// no reason found (not mandatory) - dns: "no such host"
+			reason = "unknown"
+		}
+		level.Error(logger).Log("msg", "Target found on a blacklist", "blacklist", blacklist, "reason", reason)
+		results <- true
+
 	}
 }
 
