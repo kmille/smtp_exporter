@@ -38,6 +38,17 @@ func TestSPFProberWithoutTimeout(t *testing.T) {
 		},
 	}
 
+	var spfModuleFirstDomainFails = config.Module{
+		Prober: "spf",
+		SPF: config.SPFProbe{
+			ValidSPFResult: "pass",
+			Domains: []string{
+				"google.com",
+				"androidloves.me",
+			},
+		},
+	}
+
 	var spfModuleSecondDomainFails = config.Module{
 		Prober: "spf",
 		SPF: config.SPFProbe{
@@ -116,6 +127,18 @@ func TestSPFProberWithoutTimeout(t *testing.T) {
 			config:         spfModuleFail,
 			expectedResult: true,
 			message:        "domain=androidloves.me result=fail",
+		},
+		{
+			target:         "138.201.174.101", // ip is allowed to send mails for androidloves.me, but not for google.com
+			config:         spfModuleFirstDomainFails,
+			expectedResult: false,
+			message:        "domain=google.com result=softfail",
+		},
+		{
+			target:         "2a01:4f8:c17:5036::2", // ip is allowed to send mails for androidloves.me, but not for google.com
+			config:         spfModuleFirstDomainFails,
+			expectedResult: false,
+			message:        "domain=google.com result=softfail",
 		},
 		{
 			target:         "138.201.174.101", // ip is allowed to send mails for androidloves.me, but not for google.com
