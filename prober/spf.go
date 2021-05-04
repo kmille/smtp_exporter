@@ -18,7 +18,7 @@ type spfResult struct {
 	reason error
 }
 
-// CheckHost currently does not support context (but it is in the next release)
+// CheckHost currently does not support context (but it will in the next release)
 func doSPFCheck(c chan spfResult, ip net.IP, domain string) {
 	result, reason := spf.CheckHost(ip, domain)
 	c <- spfResult{result: result,
@@ -31,13 +31,14 @@ func SPFProber(ctx context.Context, target string, module config.Module, registr
 
 	_, _, err := net.SplitHostPort(target)
 	if err == nil {
-		level.Error(logger).Log("msg", "Error validating target parameter. The target must be an ip address without a port (ipv4 or ipv6)")
+		level.Error(logger).Log("msg", "Error validating target parameter. The target must be a valid ip address without a port (ipv4 or ipv6)")
 		return result
 	}
 
 	ip := net.ParseIP(target)
 	if ip == nil {
-		level.Error(logger).Log("msg", "Error parsing target parameter. The target must be an ip address")
+		level.Error(logger).Log("msg", "Error parsing target parameter. The target must be a valid ip address")
+		return result
 	}
 
 	result.Success = true
@@ -49,14 +50,14 @@ func SPFProber(ctx context.Context, target string, module config.Module, registr
 		select {
 		case res := <-c:
 			if res.result != spf.Result(module.SPF.ValidSPFResult) {
-				level.Info(logger).Log("msg", "SPF result does not match", "domain", domain, "result", res.result, "reason", res.reason, "validSPFResult", module.SPF.ValidSPFResult)
+				level.Error(logger).Log("msg", "SPF result does not match", "domain", domain, "result", res.result, "reason", res.reason, "validSPFResult", module.SPF.ValidSPFResult)
 				result.Success = false
 				return result
 			} else {
-				level.Debug(logger).Log("msg", "SPF result matches", "domain", domain, "result", res.result, "reason", res.reason, "validSPFResult", module.SPF.ValidSPFResult)
+				level.Info(logger).Log("msg", "SPF result matches", "domain", domain, "result", res.result, "reason", res.reason, "validSPFResult", module.SPF.ValidSPFResult)
 			}
 		case <-ctx.Done():
-			level.Error(logger).Log("msg", "Error checking SPF", "err", ctx.Err())
+			level.Error(logger).Log("msg", "Execution timeout", "err", ctx.Err())
 			result.Success = false
 			return result
 		}

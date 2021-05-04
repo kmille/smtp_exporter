@@ -250,7 +250,7 @@ func TestCheckBlacklistHardTimeoutFail(t *testing.T) {
 	for _, test := range tests[0:2] {
 		result := <-results
 		if result != test.expectedResult {
-			t.Fatalf("TestCheckBlacklistSoftTimeoutFail does not work ip=%q blacklist=%q, result=%t, expectedResult=%t, expectedLog=%q, actualLog=\n%s",
+			t.Fatalf("TestCheckBlacklistHardTimeoutFail does not work ip=%q blacklist=%q, result=%t, expectedResult=%t, expectedLog=%q, actualLog=\n%s",
 				ip, test.blacklist, result, test.expectedResult, "", logCapture)
 		}
 	}
@@ -262,7 +262,7 @@ func TestCheckBlacklistHardTimeoutFail(t *testing.T) {
 	result := <-results
 	if result != failOnBlacklistTimeout {
 		// keep in mind: logCapture holds the log of all three test runs
-		t.Fatalf("TestCheckBlacklistSoftTimeoutFail does not work ip=%q blacklist=%q, result=%t, expectedResult=%t, expectedLog=%q, actualLog=\n%s",
+		t.Fatalf("TestCheckBlacklistHardTimeoutFail does not work ip=%q blacklist=%q, result=%t, expectedResult=%t, expectedLog=%q, actualLog=\n%s",
 			ip, tests[2].blacklist, result, failOnBlacklistTimeout, "Execution timeout", logCapture)
 	}
 }

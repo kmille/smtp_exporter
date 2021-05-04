@@ -301,6 +301,10 @@ func (s *SPFProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		return err
 	}
 
+	if len(s.Domains) == 0 {
+		return fmt.Errorf("SPFProbe must have at least domain")
+	}
+
 	return nil
 }
 
