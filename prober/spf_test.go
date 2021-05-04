@@ -43,7 +43,7 @@ func TestSPFProberWithoutTimeout(t *testing.T) {
 		SPF: config.SPFProbe{
 			ValidSPFResult: "pass",
 			Domains: []string{
-				"google.com",
+				"gmail.com",
 				"androidloves.me",
 			},
 		},
@@ -55,7 +55,7 @@ func TestSPFProberWithoutTimeout(t *testing.T) {
 			ValidSPFResult: "pass",
 			Domains: []string{
 				"androidloves.me",
-				"google.com",
+				"gmail.com",
 			},
 		},
 	}
@@ -129,28 +129,28 @@ func TestSPFProberWithoutTimeout(t *testing.T) {
 			message:        "domain=androidloves.me result=fail",
 		},
 		{
-			target:         "138.201.174.101", // ip is allowed to send mails for androidloves.me, but not for google.com
+			target:         "138.201.174.101", // ip is allowed to send mails for androidloves.me, but not for gmail.com
 			config:         spfModuleFirstDomainFails,
 			expectedResult: false,
-			message:        "domain=google.com result=softfail",
+			message:        "domain=gmail.com result=softfail",
 		},
 		{
-			target:         "2a01:4f8:c17:5036::2", // ip is allowed to send mails for androidloves.me, but not for google.com
+			target:         "2a01:4f8:c17:5036::2", // ip is allowed to send mails for androidloves.me, but not for gmail.com
 			config:         spfModuleFirstDomainFails,
 			expectedResult: false,
-			message:        "domain=google.com result=softfail",
+			message:        "domain=gmail.com result=softfail",
 		},
 		{
-			target:         "138.201.174.101", // ip is allowed to send mails for androidloves.me, but not for google.com
+			target:         "138.201.174.101", // ip is allowed to send mails for androidloves.me, but not for gmail.com
 			config:         spfModuleSecondDomainFails,
 			expectedResult: false,
-			message:        "domain=google.com result=softfail",
+			message:        "domain=gmail.com result=softfail",
 		},
 		{
-			target:         "2a01:4f8:c17:5036::2", // ip is allowed to send mails for androidloves.me, but not for google.com
+			target:         "2a01:4f8:c17:5036::2", // ip is allowed to send mails for androidloves.me, but not for gmail.com
 			config:         spfModuleSecondDomainFails,
 			expectedResult: false,
-			message:        "domain=google.com result=softfail",
+			message:        "domain=gmail.com result=softfail",
 		},
 	}
 	for _, test := range tests {

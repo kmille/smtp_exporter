@@ -51,8 +51,8 @@ func TestDNSBLProber(t *testing.T) {
 		Prober: "dnsbl",
 		DNSBL: config.DNSBLProbe{
 			Blacklists: []string{
-				// something like 14.110.4.42.google.com will never return a record (aka "not on a blacklist")
-				"google.com",
+				// something like 14.110.4.42.gmail.com will never return a record (aka "not on a blacklist")
+				"gmail.com",
 			},
 			FailOnBlacklistTimeout: true,
 		},
@@ -156,7 +156,7 @@ func TestDNSBLProber(t *testing.T) {
 func TestCheckBlacklistSoftTimeoutFail(t *testing.T) {
 
 	// test #1: regular test: 127.0.0.2 is on the blacklist (zen.spamhaus.org)
-	// test #2: regular test: 127.0.0.2 is not on the blacklist (google.com) - google.com ist not a spamlist, but will return no record => not on the blacklist
+	// test #2: regular test: 127.0.0.2 is not on the blacklist (gmail.com) - gmail.com ist not a spamlist, but will return no record => not on the blacklist
 	// simulate a timeout by calling cancel()
 	// test #3: we should return immediately, as we run into a timeout. As we use failOnBlacklistTimeout=false, the probe will not fail
 
@@ -171,7 +171,7 @@ func TestCheckBlacklistSoftTimeoutFail(t *testing.T) {
 			expectedResult: true,
 		},
 		{
-			blacklist:      "google.com",
+			blacklist:      "gmail.com",
 			expectedResult: false,
 		},
 		{
@@ -213,7 +213,7 @@ func TestCheckBlacklistSoftTimeoutFail(t *testing.T) {
 func TestCheckBlacklistHardTimeoutFail(t *testing.T) {
 
 	// test #1: regular test: 127.0.0.2 is on the blacklist (zen.spamhaus.org)
-	// test #2: regular test: 127.0.0.2 is not on the blacklist (google.com) - google.com ist not a spamlist, but will return no record => not on the blacklist
+	// test #2: regular test: 127.0.0.2 is not on the blacklist (gmail.com) - gmail.com ist not a spamlist, but will return no record => not on the blacklist
 	// simulate a timeout by calling cancel()
 	// test #3: we should return immediately, as we run into a timeout. As we use failOnBlacklistTimeout=true, the probe will fail
 
@@ -228,7 +228,7 @@ func TestCheckBlacklistHardTimeoutFail(t *testing.T) {
 			expectedResult: true,
 		},
 		{
-			blacklist:      "google.com",
+			blacklist:      "gmail.com",
 			expectedResult: false,
 		},
 		{
