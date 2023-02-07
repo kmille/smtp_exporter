@@ -86,6 +86,7 @@ func SMTPProber(ctx context.Context, target string, module config.Module, regist
 		// 	level.Error(logger).Log("msg", msg, "err", err)
 		// 	return
 		// }
+
 		statusCode = smtpErr.Code
 		statusCodeEnhanced = smtpErr.EnhancedCode[0]*100 + smtpErr.EnhancedCode[1]*10 + smtpErr.EnhancedCode[2]
 		level.Error(logger).Log("msg", msg, "err", err, "code", smtpErr.Code, "enhancedCode", statusCodeEnhanced)
@@ -127,9 +128,11 @@ func SMTPProber(ctx context.Context, target string, module config.Module, regist
 		probeSmtpStatusCode.Set(float64(statusCode))
 		probeSmtpEnhancedStatusCode.Set(float64(statusCodeEnhanced))
 
-		if err = c.Quit(); err != nil {
-			handleSMTPError(c, err, "Error sending QUIT command")
-		}
+		// TODO: handle error on Quit (if the server alrady closed the connection and we try to close it now, it fails
+		c.Quit()
+		//if err = c.Quit(); err != nil {
+		//	level.Error(logger).Log("msg", "Error creating SMTP client", "err", reflect.TypeOf(err), "JETZTE")
+		//}
 		// if c != nil {
 		// 	fmt.Println("CLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLOSING the SMTP client with defer")
 		// 	if err := c.Close(); err != nil {
