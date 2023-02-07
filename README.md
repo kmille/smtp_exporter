@@ -5,6 +5,12 @@
 
 smtp_exporter is a Prometheus Exporter for testing your outgoing mail server. It's internal design and usage is very similar to [blackbox_exporter](https://github.com/prometheus/blackbox_exporter). There is currently only one Prober (smtp). Check the outstanding [TODOs](/TODO) for more information. You can reload the configuration with a post request to /-/reload. There is also a history log like you know it from blackbox_exporter.
 
+# How to use it
+
+```bash
+kmille@linbox:smtp_exporter go run ./main.go ./history.go --web.listen-address="127.0.0.1:9125" --log.level=debug --config.file=smtp.yml
+```
+
 # What you can test
 
 ### Can I sent an authenticated mail (starttls)?
