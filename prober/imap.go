@@ -50,6 +50,9 @@ func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceive
 	registry.MustRegister(probeDKIMSuccess)
 	registry.MustRegister(probeDMARCSuccess)
 
+	// Set receive to zero until we find email
+	probeMessageReceived.Set(0)
+
 	c, err := newIMAPClient(ctx, module, logger)
 	if err != nil {
 		level.Error(logger).Log("msg", "Error creating IMAP client", "err", err)
@@ -120,10 +123,11 @@ func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceive
 	level.Info(logger).Log("msg", "Found previously sent message in the mailbox", "subject", m.Header.Get("Subject"))
 	probeMessageReceived.Set(1)
 
+
 	// body, err := ioutil.ReadAll(m.Body)
 	// if err != nil {
-	// 	level.Error(logger).Log("msg", "Could not read body", "err", err)
-	// 	return success
+	//	level.Error(logger).Log("msg", "Could not read body", "err", err)
+	//	return success
 	// }
 
 	// fmt.Printf("Body\n%s\n", body)
@@ -200,6 +204,13 @@ func newIMAPClient(ctx context.Context, module config.IMAPReceiver, logger log.L
 	if err != nil {
 		return nil, err
 	}
+
+	ips, err := net.LookupIP(ip)
+	if err != nil {
+		return nil, err
+	}
+	ip = ips[0].String() // Use the first resolved IP addres
+
 	var dialProtocol string
 	if net.ParseIP(ip).To4() == nil {
 		dialProtocol = "tcp6"
