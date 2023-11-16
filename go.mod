@@ -11,6 +11,7 @@ require (
 	github.com/emersion/go-smtp v0.15.0
 	github.com/go-kit/kit v0.10.0
 	github.com/google/uuid v1.2.0
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/common v0.20.0
 	github.com/prometheus/exporter-toolkit v0.5.1

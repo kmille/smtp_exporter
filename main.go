@@ -48,6 +48,7 @@ var (
 	externalURL   = kingpin.Flag("web.external-url", "The URL under which smtp exporter is externally reachable (for example, if smtp exporter is served via a reverse proxy). Used for generating relative and absolute links back to smtp exporter itself. If the URL has a path portion, it will be used to prefix all HTTP endpoints served by smtp exporter. If omitted, relevant URL components will be derived automatically.").PlaceHolder("<url>").String()
 	routePrefix   = kingpin.Flag("web.route-prefix", "Prefix for the internal routes of web endpoints. Defaults to the path of --web.external-url.").PlaceHolder("<path").String()
 	historyLimit  = kingpin.Flag("history.limit", "The maximum amount of items to keep in the history.").Default("100").Uint()
+	timeoutDefault = kingpin.Flag("timeout-default", "Set timeout to this value if header 'X-Prometheus-Scrape-Timeout-Seconds' isn't sent").Default("10").Float64()
 	timeoutOffset = kingpin.Flag("timeout-offset", "Offset to subtract from timeout in seconds").Default("0").Float64()
 
 	Probers = map[string]prober.ProberFn{
@@ -205,7 +206,7 @@ func getTimeout(r *http.Request, module config.Module, offset float64) (timeoutS
 	}
 
 	if timeoutSeconds == 0 {
-		timeoutSeconds = 120
+		timeoutSeconds = *timeoutDefault
 	}
 
 	var maxTimeOutSeconds = timeoutSeconds - offset
