@@ -80,7 +80,6 @@ func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceive
 	var seq []uint32
 	level.Info(logger).Log("msg", "Looking for previously sent message", "mailbox", module.Mailbox, "subject", subject)
 
-	// this loop does not honor the Timeout
 	for len(seq) == 0 {
 		if seq, err = c.Search(searchCriteria); err != nil {
 			level.Error(logger).Log("msg", "Error searching for messages", "err", err)
@@ -95,6 +94,11 @@ func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceive
 
 		if err = c.Noop(); err != nil {
 			level.Error(logger).Log("msg", fmt.Sprintf("Error refreshing mailbox %q", module.Mailbox), "err", err)
+			return
+		}
+
+		if ctx.Err() == context.DeadlineExceeded {
+			level.Error(logger).Log("msg", fmt.Sprintf("Timed out waiting for mail in mailbox %q", module.Mailbox))
 			return
 		}
 	}
