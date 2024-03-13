@@ -87,6 +87,11 @@ func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceive
 			return
 		}
 		time.Sleep(1 * time.Second)
+
+		if err = c.Noop(); err != nil {
+			level.Error(logger).Log("msg", fmt.Sprintf("Error refreshing mailbox %q", module.Mailbox), "err", err)
+			return
+		}
 	}
 
 	seqset := new(imap.SeqSet)
