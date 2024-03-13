@@ -86,6 +86,11 @@ func IMAPReceiver(ctx context.Context, subject string, module config.IMAPReceive
 			level.Error(logger).Log("msg", "Error searching for messages", "err", err)
 			return
 		}
+
+		if len(seq) != 0 {
+			break
+		}
+
 		time.Sleep(1 * time.Second)
 
 		if err = c.Noop(); err != nil {
