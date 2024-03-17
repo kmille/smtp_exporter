@@ -97,7 +97,7 @@ func TestSPFProberWithoutTimeout(t *testing.T) {
 			message:        "domain=androidloves.me result=pass",
 		},
 		{
-			target:         "2a01:4f8:c17:5036::2",
+			target:         "2a01:4f8:c17:5036:beef:beef:beef:beef",
 			config:         spfModulePass,
 			expectedResult: true,
 			message:        "domain=androidloves.me result=pass",
@@ -111,7 +111,7 @@ func TestSPFProberWithoutTimeout(t *testing.T) {
 		},
 		{
 			// ip is allowed to send mail, but the config expects a "fail"
-			target:         "2a01:4f8:c17:5036::2",
+			target:         "2a01:4f8:c17:5036:beef:beef:beef:beef",
 			config:         spfModuleFail,
 			expectedResult: false,
 			message:        "validSPFResult=fail",
@@ -135,7 +135,7 @@ func TestSPFProberWithoutTimeout(t *testing.T) {
 			message:        "domain=gmail.com result=softfail",
 		},
 		{
-			target:         "2a01:4f8:c17:5036::2", // ip is allowed to send mails for androidloves.me, but not for gmail.com
+			target:         "2a01:4f8:c17:5036:beef:beef:beef:beef", // ip is allowed to send mails for androidloves.me, but not for gmail.com
 			config:         spfModuleFirstDomainFails,
 			expectedResult: false,
 			message:        "domain=gmail.com result=softfail",
@@ -147,7 +147,7 @@ func TestSPFProberWithoutTimeout(t *testing.T) {
 			message:        "domain=gmail.com result=softfail",
 		},
 		{
-			target:         "2a01:4f8:c17:5036::2", // ip is allowed to send mails for androidloves.me, but not for gmail.com
+			target:         "2a01:4f8:c17:5036:beef:beef:beef:beef", // ip is allowed to send mails for androidloves.me, but not for gmail.com
 			config:         spfModuleSecondDomainFails,
 			expectedResult: false,
 			message:        "domain=gmail.com result=softfail",
