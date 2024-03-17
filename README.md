@@ -1,4 +1,4 @@
-**Unfortunately, this one of these almost-done-but-never-released project. I like it, it works in general but it needs some love to get the last TODOs done. It's open source, so feel free to get in touch with the code. If you're familiar with go, it's not that hard :)**
+**Unfortunately, this one of these almost-done-but-never-released projects. I like it, it works in general but it needs some love to get the last TODOs done. It's open source, so feel free to get in touch with the code. If you're familiar with go, it's not that hard :)**
 
 [![Go tests for smtp_exporter](https://github.com/kmille/smtp_exporter/actions/workflows/tests.yaml/badge.svg)](https://github.com/kmille/smtp_exporter/actions/workflows/tests.yaml)
 
