@@ -1,0 +1,11 @@
+.github
+metric_examples
+.dockerignore
+.gitignore
+Dockerfile
+README.md
+smtp.yml
+TODO
+
+main
+smtp_exporter
